@@ -36,6 +36,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "microphonePermission": false,
+          "photosPermission": false
+        }
+      ],
       "./plugins/withAndroidReleaseSigning"
     ],
     "experiments": {
