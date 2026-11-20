@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "exengrupo",
+    "slug": "exengrupo",
+    "version": "1.0.0",
+    "scheme": "exengrupo",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#FFFFFF",
+    "android": {
+      "package": "com.exengrupo.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "exengrupo",
+      "shortName": "exengrupo",
+      "lang": "es",
+      "themeColor": "#FFFFFF",
+      "backgroundColor": "#FFFFFF",
+      "display": "standalone"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "./plugins/withAndroidReleaseSigning"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
