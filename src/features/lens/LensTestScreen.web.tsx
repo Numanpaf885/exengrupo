@@ -10,7 +10,9 @@ import { InfoRow } from '@/components/InfoRow';
 import { Screen } from '@/components/Screen';
 import { Shutter } from '@/components/Shutter';
 import { Text } from '@/components/Text';
+import { formatFocal, lensFromExif } from '@/lib/lens/exif';
 import { format05, formatResolution, formatZoom } from '@/lib/lens/format';
+import { readJpegFocalTags } from '@/lib/lens/jpegExif';
 import { pickWebLens, WEB_KIND_LABEL, type WebPick, webBackCameras } from '@/lib/lens/webLens';
 import { colors, rule, space } from '@/theme/tokens';
 
@@ -20,6 +22,10 @@ interface Shot {
   url: string;
   width: number;
   height: number;
+  lens: string;
+  /** null = the phone's camera app did not say which lens it used. */
+  is05: boolean | null;
+  focal?: string;
 }
 
 interface Cam {
@@ -37,6 +43,7 @@ function stopStream(stream: MediaStream | null) {
 export function LensTestScreen() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [cams, setCams] = useState<Cam[]>([]);
   const [pick, setPick] = useState<WebPick<Cam> | null>(null);
@@ -132,7 +139,13 @@ export function LensTestScreen() {
           return;
         }
         if (shot) URL.revokeObjectURL(shot.url);
-        setShot({ url: URL.createObjectURL(blob), width: canvas.width, height: canvas.height });
+        setShot({
+          url: URL.createObjectURL(blob),
+          width: canvas.width,
+          height: canvas.height,
+          lens: lensLabel,
+          is05: pick?.is05 ?? false,
+        });
         stopStream(streamRef.current);
         streamRef.current = null;
         setPhase('photo');
@@ -141,6 +154,49 @@ export function LensTestScreen() {
       0.92,
     );
   };
+
+  /**
+   * Opens the phone's own camera app through <input capture>. On Android this
+   * reaches lenses the browser cannot (e.g. Xiaomi 0.6x); the lens is read
+   * back from the photo's EXIF focal length.
+   */
+  const openSystemCamera = () => {
+    // Release our camera so the phone's camera app can use it.
+    stopStream(streamRef.current);
+    streamRef.current = null;
+    if (phase === 'live') setPhase('idle');
+    fileRef.current?.click();
+  };
+
+  const onSystemPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const exifLens = lensFromExif({ ...readJpegFocalTags(await file.arrayBuffer()) });
+      if (shot) URL.revokeObjectURL(shot.url);
+      setShot({
+        url,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        lens: 'Cámara del teléfono',
+        is05: exifLens.is05,
+        focal: formatFocal(exifLens),
+      });
+      setPhase('photo');
+    } catch (e) {
+      setError(`No se pudo leer la foto: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const systemCameraButton = (
+    <Button label="Usar cámara del teléfono" kind="secondary" onPress={openSystemCamera} />
+  );
 
   const lensLabel = pick ? `${pick.device.label || 'sin nombre'} · ${WEB_KIND_LABEL[pick.kind]}` : '—';
 
@@ -172,6 +228,7 @@ export function LensTestScreen() {
             onPress={() => void openCamera()}
             disabled={phase === 'starting'}
           />
+          {systemCameraButton}
         </View>
       )}
 
@@ -190,21 +247,43 @@ export function LensTestScreen() {
           <View style={styles.shutterBar}>
             <Shutter onPress={takePhoto} />
           </View>
+          {!pick.is05 && (
+            <Text>
+              El navegador no encuentra la lente ultra gran angular. Usa la cámara del teléfono y elige 0.6x o
+              0.5x allí.
+            </Text>
+          )}
+          {systemCameraButton}
         </View>
       )}
 
-      {phase === 'photo' && shot && pick && (
+      {phase === 'photo' && shot && (
         <View style={styles.block}>
           <Text variant="title">Foto</Text>
           <img src={shot.url} alt="Foto tomada" style={imgStyle} />
-          <InfoRow label="Lente" value={lensLabel} />
+          <InfoRow label="Lente" value={shot.lens} />
           <InfoRow label="Resolución" value={formatResolution(shot.width, shot.height)} />
-          <InfoRow label="Ultra gran angular" value={format05(pick.is05)} />
+          {shot.focal !== undefined && <InfoRow label="Distancia focal" value={shot.focal} />}
+          <InfoRow
+            label="Ultra gran angular"
+            value={shot.is05 === null ? '0.5x: no se sabe' : format05(shot.is05)}
+          />
           <Button label="Repetir" kind="secondary" onPress={() => void openCamera()} />
+          {systemCameraButton}
         </View>
       )}
 
       {error && <Text variant="label">{error}</Text>}
+
+      {/* Always mounted, so a photo still arrives if the screen changes while the camera app is open. */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => void onSystemPhoto(e.target.files?.[0])}
+      />
     </Screen>
   );
 }
