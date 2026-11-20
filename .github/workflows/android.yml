@@ -67,6 +67,8 @@ jobs:
       - name: Build release APK
         working-directory: android
         env:
+          # Public, inlined into the JS bundle at build time.
+          EXPO_PUBLIC_API_URL: https://exengrupo.vercel.app
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}

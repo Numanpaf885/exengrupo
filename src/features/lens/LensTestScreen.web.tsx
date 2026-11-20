@@ -40,7 +40,7 @@ function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((t) => t.stop());
 }
 
-export function LensTestScreen() {
+export function LensTestScreen({ onBack }: { onBack?: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -201,7 +201,7 @@ export function LensTestScreen() {
   const lensLabel = pick ? `${pick.device.label || 'sin nombre'} · ${WEB_KIND_LABEL[pick.kind]}` : '—';
 
   return (
-    <Screen>
+    <Screen onBack={onBack}>
       <Text variant="display">Prueba de lente</Text>
 
       {cams.length > 0 && (
