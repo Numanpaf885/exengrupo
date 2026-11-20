@@ -210,4 +210,7 @@ PR builds only upload a workflow artifact.
 - Redmi Note 10 Pro (MIUI): the 0.6x ultra-wide is hidden from third-party apps;
   only "Back Camera" (wide-angle, zoom 1x–10x) is exposed. The app correctly
   falls back to it and shows "0.5x no disponible". No camera library can reach
-  that lens.
+  that lens. Workaround (Android only): the "Usar cámara del teléfono" button opens
+  the phone's own camera app via expo-image-picker (ACTION_IMAGE_CAPTURE); the
+  user picks 0.6x there. The lens is then read from EXIF FocalLengthIn35mmFilm
+  (< 20 mm = ultra-wide; missing = "0.5x: no se sabe"), see `src/lib/lens/exif.ts`.
