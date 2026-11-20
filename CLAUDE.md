@@ -214,3 +214,5 @@ PR builds only upload a workflow artifact.
   the phone's own camera app via expo-image-picker (ACTION_IMAGE_CAPTURE); the
   user picks 0.6x there. The lens is then read from EXIF FocalLengthIn35mmFilm
   (< 20 mm = ultra-wide; missing = "0.5x: no se sabe"), see `src/lib/lens/exif.ts`.
+  The web build has the same button: a hidden `<input type="file" capture="environment">`
+  opens the phone camera app; EXIF is read by `src/lib/lens/jpegExif.ts`.
