@@ -66,7 +66,7 @@ interface Shot {
 
 const fileUri = (path: string): string => (path.startsWith('file://') ? path : `file://${path}`);
 
-export function LensTestScreen() {
+export function LensTestScreen({ onBack }: { onBack?: () => void }) {
   const permission = useCameraPermission();
   const devices = useCameraDevices();
   const back = useMemo(() => backDevices(devices), [devices]);
@@ -135,7 +135,7 @@ export function LensTestScreen() {
     : '—';
 
   return (
-    <Screen>
+    <Screen onBack={onBack}>
       <Text variant="display">Prueba de lente</Text>
 
       {!permission.hasPermission ? (

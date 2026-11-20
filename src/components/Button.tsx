@@ -37,7 +37,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   primary: { backgroundColor: colors.accent },
-  secondary: { borderWidth: rule.width, borderColor: colors.text, backgroundColor: colors.background },
+  // The border eats into the padding so the label stays flush with primary buttons.
+  secondary: {
+    borderWidth: rule.width,
+    borderColor: colors.text,
+    backgroundColor: colors.background,
+    paddingHorizontal: space(2) - rule.width,
+  },
   dim: { opacity: 0.5 },
   label: { ...type.body, fontFamily: fonts.bold },
 });
