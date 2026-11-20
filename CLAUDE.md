@@ -184,6 +184,8 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Android pick order: physical ultra-wide → logical multi-camera with
   minZoom < 1 (opened at minZoom) → virtual camera containing an ultra-wide →
   widest back camera ("0.5x no disponible").
+- Android Chrome (web) labels are "camera2 N, facing back", so the web build
+  cannot identify an ultra-wide there; Android users use the APK.
 - Web pick order: ultra-wide by label (EN/ES, accent-insensitive) → virtual
   dual-wide/triple (at minimum `zoom` if the track supports it) → default back
   camera. Only an ultra-wide label counts as "0.5x: sí" on web.
@@ -195,3 +197,17 @@ The release APK is signed with a keystore from repository secrets:
 `ANDROID_KEY_PASSWORD`. Without them, CI still builds but signs with the shared
 debug key and names the artifact `exengrupo-<run>-debugkey`. versionCode = the
 GitHub run number, so each build installs over the previous one.
+
+### APK downloads (GitHub Releases)
+
+Every successful build on `main` publishes a GitHub Release `build-<run number>`
+with `exengrupo.apk` attached. The newest APK is always at
+https://github.com/Numanpaf885/exengrupo/releases/latest/download/exengrupo.apk.
+PR builds only upload a workflow artifact.
+
+### Known device limits
+
+- Redmi Note 10 Pro (MIUI): the 0.6x ultra-wide is hidden from third-party apps;
+  only "Back Camera" (wide-angle, zoom 1x–10x) is exposed. The app correctly
+  falls back to it and shows "0.5x no disponible". No camera library can reach
+  that lens.
