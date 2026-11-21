@@ -17,12 +17,19 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="crear" />
+        <Stack.Screen name="unirse/index" />
+        <Stack.Screen name="espacio/[id]/index" />
+        <Stack.Screen name="espacio/[id]/camara" />
+        <Stack.Screen name="espacio/[id]/miembros" />
         <Stack.Screen name="lente" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
       </Stack.Protected>
+      {/* Join links work signed in or out (signed out: log in first, then join). */}
+      <Stack.Screen name="unirse/[code]" />
     </Stack>
   );
 }

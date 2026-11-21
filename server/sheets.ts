@@ -138,17 +138,18 @@ export class SheetsClient {
     );
   }
 
-  /** Update some cells of one data row (never row 1). */
+  /** Update some cells of one data row (never row 1), in a single batch request. */
   async updateCells(tab: string, headers: string[], rowNumber: number, values: Record<string, string>) {
     if (rowNumber < 2) throw new Error('Refusing to write the header row');
-    for (const [key, value] of Object.entries(values)) {
+    const data = Object.entries(values).map(([key, value]) => {
       const col = headers.indexOf(key);
       if (col === -1) throw new Error(`Column "${key}" is not in the sheet headers`);
-      const range = `${tab}!${columnLetter(col + 1)}${rowNumber}`;
-      await this.call(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
-        method: 'PUT',
-        body: JSON.stringify({ values: [[value]] }),
-      });
-    }
+      return { range: `${tab}!${columnLetter(col + 1)}${rowNumber}`, values: [[value]] };
+    });
+    if (data.length === 0) return;
+    await this.call('/values:batchUpdate', {
+      method: 'POST',
+      body: JSON.stringify({ valueInputOption: 'RAW', data }),
+    });
   }
 }

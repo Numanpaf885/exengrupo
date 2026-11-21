@@ -5,10 +5,13 @@
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~58.0.17",
+    "@supabase/realtime-js": "^2.119.2",
+    "aws4fetch": "^1.0.20",
     "bcryptjs": "^3.0.3",
     "expo": "~58.0.26",
     "expo-constants": "~58.0.16",
     "expo-font": "~58.0.12",
+    "expo-image-manipulator": "~58.0.16",
     "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.17",
     "expo-router": "~58.0.32",

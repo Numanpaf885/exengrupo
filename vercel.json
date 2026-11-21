@@ -4,5 +4,12 @@
   "installCommand": "npm ci",
   "buildCommand": "npx expo export -p web",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "functions": {
+    "api/spaces.ts": { "maxDuration": 60 }
+  },
+  "crons": [{ "path": "/api/cron/heartbeat", "schedule": "17 6 * * *" }],
+  "rewrites": [
+    { "source": "/api/spaces/:path*", "destination": "/api/spaces?__path=:path*" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }
