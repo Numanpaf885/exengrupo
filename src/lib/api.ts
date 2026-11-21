@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { apiBase } from './apiBase';
+import { setOffline } from './connectivity';
 
 const BASE = apiBase(Platform.OS, process.env.EXPO_PUBLIC_API_URL);
 
@@ -11,7 +12,12 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; 
 /** JSON request to /api. Never throws: network failures come back as status 0. */
 export async function api<T>(
   path: string,
-  { method = 'GET', body, token }: { method?: string; body?: unknown; token?: string } = {},
+  {
+    method = 'GET',
+    body,
+    form,
+    token,
+  }: { method?: string; body?: unknown; form?: FormData; token?: string } = {},
 ): Promise<ApiResult<T>> {
   let res: Response;
   try {
@@ -21,11 +27,14 @@ export async function api<T>(
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      // multipart: let fetch set the boundary header itself
+      body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
   } catch {
+    setOffline(true);
     return { ok: false, status: 0, error: OFFLINE_MESSAGE };
   }
+  setOffline(false);
   let data: unknown = null;
   try {
     data = await res.json();

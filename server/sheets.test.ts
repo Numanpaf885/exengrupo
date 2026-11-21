@@ -99,8 +99,16 @@ describe('SheetsClient (mocked fetch)', () => {
 
   it('updates single cells and never row 1', async () => {
     const { fetchMock, client } = setup();
-    await client.updateCells('users', ['user_id', 'username', 'last_login'], 5, { last_login: 'now' });
-    expect(fetchMock.mock.calls[0][0]).toContain(`/values/${encodeURIComponent('users!C5')}?valueInputOption=RAW`);
+    await client.updateCells('users', ['user_id', 'username', 'last_login'], 5, { last_login: 'now', username: 'x' });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://sheets.googleapis.com/v4/spreadsheets/sheet-1/values:batchUpdate');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      valueInputOption: 'RAW',
+      data: [
+        { range: 'users!C5', values: [['now']] },
+        { range: 'users!B5', values: [['x']] },
+      ],
+    });
     await expect(client.updateCells('users', ['a'], 1, { a: 'x' })).rejects.toThrow(/header row/);
   });
 

@@ -25,7 +25,8 @@ export const type = {
   body: { fontSize: 16, lineHeight: 24 },
   title: { fontSize: 32, lineHeight: 40 },
   display: { fontSize: 48, lineHeight: 56 },
-  answer: { fontSize: 40, lineHeight: 48 },
+  /** Answers: large, but a 10-question line still fits a 360 px screen. */
+  answer: { fontSize: 32, lineHeight: 40 },
 } as const;
 
 /** Hairline rules are 2 px, black. */

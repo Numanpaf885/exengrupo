@@ -1,7 +1,7 @@
 import { Text as RNText, type TextProps, StyleSheet } from 'react-native';
 import { colors, fonts, type } from '@/theme/tokens';
 
-type Variant = 'body' | 'label' | 'title' | 'display';
+type Variant = 'body' | 'label' | 'title' | 'display' | 'answer';
 
 export function Text({ variant = 'body', style, ...props }: TextProps & { variant?: Variant }) {
   return <RNText {...props} style={[styles.base, styles[variant], style]} />;
@@ -13,4 +13,5 @@ const styles = StyleSheet.create({
   label: { ...type.small, fontFamily: fonts.bold },
   title: { ...type.title, fontFamily: fonts.bold, letterSpacing: -0.5 },
   display: { ...type.display, fontFamily: fonts.bold, letterSpacing: -1 },
+  answer: { ...type.answer, fontFamily: fonts.bold, letterSpacing: -0.5 },
 });

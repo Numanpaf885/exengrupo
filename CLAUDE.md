@@ -158,8 +158,10 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 ### Layout
 
 - `src/app/` — Expo Router routes only. `_layout.tsx` wraps everything in
-  `AuthProvider` and uses `Stack.Protected`: signed in → `index` (home), `lente`;
-  signed out → `login`, `register`.
+  `AuthProvider` and uses `Stack.Protected`: signed in → `index` (my spaces),
+  `crear`, `unirse/index`, `espacio/[id]/index` (feed), `espacio/[id]/camara`,
+  `espacio/[id]/miembros`, `lente`; signed out → `login`, `register`;
+  `unirse/[code]` (join link) works either way.
 - `src/features/` — screens. A `*.web.tsx` file next to a `*.tsx` file is the web
   version; Metro picks it on web, so native-only libraries (VisionCamera) are
   never bundled for web.
@@ -213,6 +215,65 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - API base: web calls its own origin (Vercel previews work); Android uses
   `EXPO_PUBLIC_API_URL` (set in the workflow), default https://exengrupo.vercel.app.
 - TypeScript 6 loads no global types by default: tsconfig sets `"types": ["node"]`.
+
+### Spaces (slice 3)
+
+- One Vercel function serves every `/api/spaces/*` route (`api/spaces.ts` +
+  `server/router.ts`): Hobby allows only 12 functions. `vercel.json` rewrites
+  `/api/spaces/:path*` → `/api/spaces?__path=:path*`. Route list is at the top of `api/spaces.ts`.
+- Handlers in `server/spaces.ts` / `server/posts.ts` take `DataDeps` (tables over
+  Sheet tabs via `server/table.ts`); tests use `memoryTable` (`server/testing.ts`).
+- Join code: 6 letters from `ABCDEFGHJKMNPQRSTUVWXYZ` (no I/L/O), unique among
+  active spaces. channel_id: 24 random bytes → 32 base64url chars.
+- Roles: `creator` / `member`. Booleans are written as "TRUE"/"FALSE"; a ticked
+  checkbox also reads as TRUE. A removed member can't rejoin with the code.
+- Join link: `https://exengrupo.vercel.app/unirse/CODE`. Signed out → login/register,
+  then `pendingJoin` makes home open the link again.
+
+### Photos → live answers (slice 4)
+
+- Camera inside a space: `src/features/camera/PhotoCapture(.web).tsx` (same lens
+  rules as slice 1, plus "Usar cámara del teléfono"). Compression:
+  `src/lib/photo/compress(.web).ts` → long edge ≤ 2000 px, JPEG, < 3 MB.
+- Upload: multipart field `photo` to `POST /api/spaces/:id/posts`; the camera
+  screen hands it to `src/features/spaces/uploads.ts` and returns to the feed.
+- Server pipeline (`server/posts.ts`): R2 `spaces/{space_id}/{post_id}.jpg`
+  (aws4fetch SigV4, `server/storage.ts`) → posts row `processing` → broadcast →
+  AI → row `done`/`error` with the answer line and `models` → broadcast.
+  `photo_expires_at = created_at + 7 days`.
+- AI (`server/ai/`): Gemini + Groq in parallel; a failed/rate-limited slot is
+  replaced by OpenRouter (one shared call). Model IDs: env `GEMINI_MODEL`,
+  `GROQ_MODEL`, `OPENROUTER_MODEL`, defaults in `DEFAULT_MODELS` (providers.ts).
+  Verified Nov 2026 from the official SDK/docs repos on GitHub (the docs sites are
+  blocked from the cloud container): `gemini-3.8-flash` (cookbook/js-genai),
+  `meta-llama/llama-4-scout-17b-16e-instruct` (groq-sdk 1.6.0 model enum).
+  The OpenRouter default `google/gemma-3-27b-it:free` could NOT be verified —
+  check https://openrouter.ai/models?max_price=0&input_modalities=image.
+- `parseAnswers` / `mergeAnswers` / `formatAnswers` in `server/ai/answers.ts`
+  implement the exact display format; messages: UNREADABLE, quota ("prueba en X
+  min", X from RetryInfo / Retry-After / X-RateLimit-Reset, else 5), AI_FAILED.
+- Realtime: server → `POST {SUPABASE_URL}/realtime/v1/api/broadcast/{channel_id}/events/post`
+  with header `apikey: SUPABASE_SECRET_KEY` (never Bearer: sb_ keys aren't JWTs),
+  body `{post_id}` only. App: `@supabase/realtime-js` on a public channel with the
+  publishable key (`src/lib/realtime.ts`), then fetches the post from /api.
+  Needs EXPO_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY (Vercel env for web; GitHub
+  repository Variables for the APK). Without them the feed refreshes on focus /
+  "Actualizar".
+- Heartbeat: Vercel cron `17 6 * * *` → `/api/cron/heartbeat` (Bearer
+  CRON_SECRET) → reads the one row of `public.heartbeat` and PATCHes its
+  `last_*`/`*ping*`/`*beat*`/`updated*` column (or another non-created timestamp,
+  or the id to itself) via PostgREST with the secret key.
+
+### Polish (slice 5)
+
+- Offline: any /api call that can't connect sets `src/lib/connectivity.ts`;
+  `Screen` shows a black "Sin conexión. Revisa tu internet." bar until a call
+  succeeds (web also listens to online/offline events).
+- Loading states: "Cargando…", "Creando…", "Uniéndome…", "Enviando y analizando…",
+  "Analizando…". Destructive actions confirm first (`src/lib/confirm(.web).ts`).
+- Answers use the `answer` text style (bold 32/40); on display only, the "?" is
+  glued to its answer with a non-breaking space and web keeps the double spaces.
+- Checked at 360 px and 430 px with no horizontal overflow (Playwright, mocked /api).
 
 ### Android signing (GitHub secrets)
 

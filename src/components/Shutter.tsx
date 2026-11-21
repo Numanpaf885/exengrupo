@@ -6,7 +6,7 @@ export function Shutter({ onPress, disabled }: { onPress: () => void; disabled?:
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Tomar foto"
+      accessibilityLabel="Disparar"
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.outer, (pressed || disabled) && { opacity: 0.5 }]}
