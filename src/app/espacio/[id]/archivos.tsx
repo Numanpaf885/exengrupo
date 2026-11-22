@@ -2,11 +2,13 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { Badge, Chip } from '@/components/Badge';
 import { FadeIn } from '@/components/FadeIn';
 import { ListRow } from '@/components/ListRow';
 import { LoadingBar } from '@/components/LoadingBar';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { Card, Section } from '@/components/Section';
 import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
 import { type FileView, filesApi } from '@/features/files/api';
@@ -15,7 +17,7 @@ import { typeLabel } from '@/features/files/picked';
 import { dismissFileJob, startFileUpload, useFileJobs } from '@/features/files/uploads';
 import { confirmAction } from '@/lib/confirm';
 import { memo } from '@/lib/memo';
-import { rule, space as grid } from '@/theme/tokens';
+import { space as grid } from '@/theme/tokens';
 
 const MAX_FILES = 20;
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -23,21 +25,30 @@ const key = (id: string) => `files:${id}`;
 
 const pagesLabel = (n: number | null, type: string) =>
   n === null || type === 'txt' || type === 'md' || type === 'docx' ? null : n === 1 ? '1 página' : `${n} páginas`;
-const statusLabel = (s: string) => (s === 'listo' ? 'Listo' : s === 'error' ? 'Error' : 'Procesando…');
+
+const statusChip = (s: string) =>
+  s === 'listo' ? <Chip label="Listo" tone="success" /> : s === 'error' ? <Chip label="Error" tone="danger" /> : <Chip label="Procesando" tone="neutral" />;
+
+const badgeText = (type: string) => (type === 'jpg' || type === 'png' ? 'IMG' : type === 'docx' ? 'DOC' : type.toUpperCase());
 
 function FileRow({ file, onDelete, busy }: { file: FileView; onDelete: () => void; busy: boolean }) {
-  const meta = [typeLabel(file.type), pagesLabel(file.pages, file.type), statusLabel(file.status)].filter(Boolean).join(' · ');
+  const meta = [typeLabel(file.type), pagesLabel(file.pages, file.type), `subido por ${file.uploader}`].filter(Boolean).join(' · ');
   return (
-    <ListRow>
-      <View style={styles.row}>
-        <View style={styles.grow}>
-          <Text variant="label" numberOfLines={2}>
-            {file.name}
-          </Text>
-          <Text>{meta}</Text>
-          {file.status === 'error' && !!file.error && <Text>{file.error}</Text>}
-          {file.status === 'procesando' && <LoadingBar label="Procesando…" />}
-        </View>
+    <ListRow leading={<Badge text={badgeText(file.type)} tone={file.status === 'listo' ? 'accent' : 'neutral'} />}>
+      <Text variant="headline" numberOfLines={2}>
+        {file.name}
+      </Text>
+      <Text variant="caption" tone="secondary">
+        {meta}
+      </Text>
+      {file.status === 'error' && !!file.error && (
+        <Text variant="caption" tone="accent">
+          {file.error}
+        </Text>
+      )}
+      {file.status === 'procesando' && <LoadingBar label="Procesando…" />}
+      <View style={styles.actions}>
+        {statusChip(file.status)}
         {file.can_delete && <Button kind="ghost" label="Borrar" onPress={onDelete} disabled={busy} />}
       </View>
     </ListRow>
@@ -117,56 +128,64 @@ export default function Archivos() {
   return (
     <Screen
       onBack={() => (router.canGoBack() ? router.back() : router.replace(`/espacio/${spaceId}`))}
-      footer={<Button label="Añadir archivo" onPress={() => void add()} flex trailing="+" />}
+      footer={<Button label="Añadir archivo" onPress={() => void add()} flex />}
     >
       <View style={styles.head}>
         <Text variant="display">Archivos</Text>
-        <Text>
-          El libro o los apuntes del grupo. Al analizar una foto, la IA los usa como fuente principal. Nadie puede abrirlos ni
-          descargarlos desde la app.
+        <Text tone="secondary">
+          El libro o los apuntes del grupo. Al analizar una foto, la IA los usa como fuente principal.
         </Text>
-        <Text variant="label">PDF, Word, texto o imagen · hasta 50 MB y 500 páginas · máximo 20</Text>
       </View>
 
       <Notice text={error} />
 
-      <View style={files?.length || jobs.list.length ? styles.list : undefined}>
-        {jobs.list.map((j) => (
-          <FadeIn key={j.id}>
-            <ListRow>
-              <Text variant="label" numberOfLines={2}>
-                {j.name}
-              </Text>
-              {j.state === 'error' ? (
-                <>
-                  <Notice text={j.error} />
-                  <Button kind="ghost" label="Descartar" onPress={() => dismissFileJob(j.id)} />
-                </>
-              ) : (
-                <>
-                  <Text>
-                    {j.state === 'subiendo' ? 'Subiendo' : 'Procesando'}
-                    {j.progress ? ` · ${j.progress}` : '…'}
-                  </Text>
-                  <LoadingBar label={j.state === 'subiendo' ? 'Subiendo…' : 'Procesando…'} />
-                </>
-              )}
-            </ListRow>
-          </FadeIn>
-        ))}
-        {files?.map((f, i) => (
-          <FadeIn key={f.file_id} index={i}>
-            <FileRow file={f} busy={busy} onDelete={() => void remove(f)} />
-          </FadeIn>
-        ))}
-      </View>
+      {(jobs.list.length > 0 || !!files?.length) && (
+        <Section
+          title={files ? `${files.length} de ${MAX_FILES} archivos` : undefined}
+          footer="Nadie puede abrir ni descargar estos archivos desde la app: solo los lee la IA."
+        >
+          {jobs.list.map((j) => (
+            <FadeIn key={j.id}>
+              <ListRow leading={<Badge text="↑" tone="neutral" />}>
+                <Text variant="headline" numberOfLines={2}>
+                  {j.name}
+                </Text>
+                {j.state === 'error' ? (
+                  <>
+                    <Text variant="caption" tone="accent">
+                      {j.error}
+                    </Text>
+                    <Button kind="ghost" label="Descartar" onPress={() => dismissFileJob(j.id)} />
+                  </>
+                ) : (
+                  <>
+                    <Text variant="caption" tone="secondary">
+                      {j.state === 'subiendo' ? 'Subiendo' : 'Procesando'}
+                      {j.progress ? ` · ${j.progress}` : '…'}
+                    </Text>
+                    <LoadingBar label={j.state === 'subiendo' ? 'Subiendo…' : 'Procesando…'} />
+                  </>
+                )}
+              </ListRow>
+            </FadeIn>
+          ))}
+          {files?.map((f, i) => (
+            <FadeIn key={f.file_id} index={i}>
+              <FileRow file={f} busy={busy} onDelete={() => void remove(f)} />
+            </FadeIn>
+          ))}
+        </Section>
+      )}
       {files === null && !error && <LoadingBar label="Cargando…" />}
       {empty && (
         <FadeIn>
-          <View style={styles.empty}>
-            <Text variant="title">Aún no hay archivos.</Text>
-            <Text>Añade el libro del curso o los apuntes del profesor para que las respuestas sigan vuestro temario.</Text>
-          </View>
+          <Card>
+            <Text variant="headline">Aún no hay archivos</Text>
+            <Text tone="secondary">
+              Añade el libro del curso o los apuntes del profesor (PDF, Word, texto o imagen, hasta 50 MB y 500 páginas) para que
+              las respuestas sigan vuestro temario.
+            </Text>
+          </Card>
         </FadeIn>
       )}
     </Screen>
@@ -175,8 +194,5 @@ export default function Archivos() {
 
 const styles = StyleSheet.create({
   head: { gap: grid(1) },
-  list: { borderBottomWidth: rule.width, borderBottomColor: rule.color },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: grid(2) },
-  grow: { flex: 1, gap: grid(1) },
-  empty: { gap: grid(1), paddingVertical: grid(2) },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: grid(2), marginTop: grid(0.5) },
 });

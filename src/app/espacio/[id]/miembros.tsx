@@ -2,11 +2,13 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { Badge, initials } from '@/components/Badge';
 import { FadeIn } from '@/components/FadeIn';
 import { ListRow } from '@/components/ListRow';
 import { LoadingBar } from '@/components/LoadingBar';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { Section } from '@/components/Section';
 import { Text } from '@/components/Text';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -90,39 +92,34 @@ export default function Miembros() {
       <Text variant="display">Miembros</Text>
       <Notice text={error} />
       {!space && !error && <LoadingBar label="Cargando…" />}
-      <View>
-        {space?.members.map((m, i) => (
-          <FadeIn key={m.user_id} index={i}>
-            <ListRow>
-              <View style={styles.member}>
-                <View style={styles.grow}>
-                  <Text variant="title" numberOfLines={1}>
-                    {m.username}
-                  </Text>
-                  <Text>
-                    {m.is_creator ? 'Creador del espacio' : 'Miembro'}
-                    {m.user_id === user?.user_id ? ' · tú' : ''}
-                  </Text>
-                </View>
-                {space.is_creator && !m.is_creator && (
-                  <Button
-                    label="Quitar"
-                    kind="ghost"
-                    onPress={() => void removeMember(m.user_id, m.username)}
-                    disabled={busy}
-                  />
-                )}
-              </View>
-            </ListRow>
-          </FadeIn>
-        ))}
-      </View>
+      {!!space?.members.length && (
+        <Section title={`${space.members.length} miembros`}>
+          {space.members.map((m, i) => (
+            <FadeIn key={m.user_id} index={i}>
+              <ListRow
+                leading={<Badge text={initials(m.username)} round tone={m.is_creator ? 'accent' : 'neutral'} />}
+                trailing={
+                  space.is_creator && !m.is_creator ? (
+                    <Button kind="ghost" label="Quitar" onPress={() => void removeMember(m.user_id, m.username)} disabled={busy} />
+                  ) : null
+                }
+              >
+                <Text variant="headline" numberOfLines={1}>
+                  {m.username}
+                  {m.user_id === user?.user_id ? ' (tú)' : ''}
+                </Text>
+                <Text variant="caption" tone="secondary">
+                  {m.is_creator ? 'Creador del espacio' : 'Miembro'}
+                </Text>
+              </ListRow>
+            </FadeIn>
+          ))}
+        </Section>
+      )}
 
       {space?.is_creator && (
         <View style={styles.block}>
-          <ListRow>
-            <Text variant="title">Ajustes</Text>
-          </ListRow>
+          <Text variant="title">Ajustes</Text>
           <TextField
             label="Nombre del espacio"
             value={name}
@@ -130,17 +127,13 @@ export default function Miembros() {
             autoCapitalize="sentences"
             maxLength={SPACE_NAME_MAX}
           />
-          <Notice text={saved} />
+          <Notice text={saved} tone="success" />
           <Button label={busy ? 'Guardando…' : 'Guardar nombre'} onPress={rename} disabled={busy} />
-          <Button label="Eliminar espacio" kind="secondary" onPress={() => void deleteSpace()} disabled={busy} />
+          <Button label="Eliminar espacio" kind="destructive" onPress={() => void deleteSpace()} disabled={busy} />
         </View>
       )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  block: { gap: grid(2) },
-  member: { flexDirection: 'row', alignItems: 'center', gap: grid(2) },
-  grow: { flex: 1 },
-});
+const styles = StyleSheet.create({ block: { gap: grid(2) } });

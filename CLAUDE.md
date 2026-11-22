@@ -87,11 +87,14 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   - Unreadable photo → "No se lee bien, repite la foto". All providers out of
     quota → "Límite de IA alcanzado, prueba en X min" (X from the provider's
     retry info if it gives one, otherwise 5).
-- Design: Swiss / International Typographic Style. White #FFFFFF background,
-  black #000000 text, and one accent, Swiss red #DA291C, used only for primary
-  actions and the shutter button. Inter font, strict 8 px grid, flush-left text,
-  large type for answers. No rounded corners, shadows, gradients or emoji. All UI
-  text in Spanish.
+- Design (user decision 2026-11-22, replaces the original Swiss style): a modern
+  Apple-style interface. Grouped light-gray background #F2F2F7 with white rounded
+  cards and inset grouped lists, hairline separators, large titles, "‹ Atrás" nav,
+  a frosted pinned bottom bar, capsule chips, soft banners. One tint colour, the
+  exengrupo red #DA291C, for actions and links (filled = main action, tinted =
+  secondary). Inter (400/500/600/700) on an 8 px grid (4 px half-steps), body 17,
+  large bold type for answers, iOS-camera chrome (white round shutter, translucent
+  pills). No gradients, no heavy shadows, no emoji, no dark mode. All UI text in Spanish.
 - Camera: MUST open at 0.5x (ultra-wide) when the phone exposes that lens. If it
   doesn't, use the widest lens available and show "0.5x no disponible".
 
@@ -189,8 +192,11 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   version; Metro picks it on web, so native-only libraries (VisionCamera) are
   never bundled for web.
 - `src/lib/` — pure logic with `*.test.ts` unit tests (Vitest, `npm test`).
-- `src/theme/tokens.ts` — the only place colours, grid, fonts and type sizes live.
-- `src/components/` — Swiss primitives (Text, Button, Shutter, InfoRow, Screen).
+- `src/theme/tokens.ts` — the only place colours, radii, grid, fonts and type sizes live.
+- `src/components/` — UI primitives: Text (variants + tones), Button (primary /
+  secondary / ghost / destructive / small), Screen (nav row, frosted footer),
+  Section + Card (inset grouped lists), ListRow (cell with leading/trailing, chevron),
+  Badge / Chip, TextField, Notice, LoadingBar, Shutter, FadeIn.
 - `api/` — Vercel functions (web-standard `GET`/`POST` handlers), kept thin.
 - `server/` — server-only code imported by `api/` (never by the app): Sheets
   client, sessions, auth handlers. Use relative imports here (no `@/` alias).

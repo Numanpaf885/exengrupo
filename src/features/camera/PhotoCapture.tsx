@@ -128,6 +128,6 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
 
 const styles = StyleSheet.create({
   center: { padding: space(2), gap: space(2) },
-  onBlack: { color: colors.background },
+  onBlack: { color: colors.white },
   pad: { padding: space(2) },
 });

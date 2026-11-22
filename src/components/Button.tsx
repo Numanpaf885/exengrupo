@@ -1,5 +1,5 @@
 import { Animated, Pressable, StyleSheet } from 'react-native';
-import { colors, fonts, rule, space, type } from '@/theme/tokens';
+import { colors, fonts, radius, space, type } from '@/theme/tokens';
 import { Text } from './Text';
 import { usePressScale } from './usePressScale';
 
@@ -7,21 +7,24 @@ interface Props {
   label: string;
   onPress: () => void;
   /**
-   * primary = Swiss red (primary actions only). secondary = black outline.
-   * selected = black (current tab). ghost = bold text only (header links).
+   * primary = filled red (the main action) · secondary = tinted (light red) ·
+   * selected = filled black (current tab) · ghost = red text link (bars, rows).
+   * destructive = red text on a white card.
    */
-  kind?: 'primary' | 'secondary' | 'selected' | 'ghost';
+  kind?: 'primary' | 'secondary' | 'selected' | 'ghost' | 'destructive';
   disabled?: boolean;
   /** Stretch to fill the row (used side by side in footers). */
   flex?: boolean;
-  /** Shown at the right edge, e.g. "→". */
+  /** Small trailing glyph for text links, e.g. "›". Ignored on filled buttons. */
   trailing?: string;
+  /** Compact capsule (e.g. "Invitar" next to the code). */
+  small?: boolean;
 }
 
-export function Button({ label, onPress, kind = 'primary', disabled, flex, trailing }: Props) {
-  const press = usePressScale();
-  const filled = kind === 'primary' || kind === 'selected';
-  const color = filled ? colors.onAccent : colors.text;
+export function Button({ label, onPress, kind = 'primary', disabled, flex, trailing, small }: Props) {
+  const press = usePressScale(kind === 'ghost' ? 1 : 0.97);
+  const color = kind === 'primary' || kind === 'selected' ? colors.onAccent : colors.accent;
+  const ghost = kind === 'ghost';
   return (
     <Animated.View style={[press.style, flex && styles.flex, disabled && styles.dim]}>
       <Pressable
@@ -32,13 +35,18 @@ export function Button({ label, onPress, kind = 'primary', disabled, flex, trail
         onPress={onPress}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
-        hitSlop={kind === 'ghost' ? 8 : undefined}
-        style={({ pressed }) => [styles.base, styles[kind], pressed && styles.pressed]}
+        hitSlop={ghost || small ? 8 : undefined}
+        style={({ pressed }) => [
+          styles.base,
+          styles[kind],
+          small && styles.small,
+          pressed && (ghost ? styles.ghostPressed : styles.pressed),
+        ]}
       >
-        <Text style={[styles.label, { color }]} numberOfLines={1}>
+        <Text style={[ghost ? styles.ghostLabel : small ? styles.smallLabel : styles.label, { color }]} numberOfLines={1}>
           {label}
         </Text>
-        {trailing && <Text style={[styles.label, { color }]}>{trailing}</Text>}
+        {ghost && trailing ? <Text style={[styles.ghostLabel, styles.trailing, { color: colors.secondary }]}>{trailing}</Text> : null}
       </Pressable>
     </Animated.View>
   );
@@ -47,24 +55,25 @@ export function Button({ label, onPress, kind = 'primary', disabled, flex, trail
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   base: {
-    minHeight: space(7),
-    paddingHorizontal: space(2),
+    minHeight: 50,
+    paddingHorizontal: space(2.5),
+    borderRadius: radius.md,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: space(1),
   },
   primary: { backgroundColor: colors.accent },
-  selected: { backgroundColor: colors.text },
-  // The border eats into the padding so the label stays flush with primary buttons.
-  secondary: {
-    borderWidth: rule.width,
-    borderColor: colors.text,
-    backgroundColor: colors.background,
-    paddingHorizontal: space(2) - rule.width,
-  },
-  ghost: { minHeight: space(6), paddingHorizontal: 0, justifyContent: 'flex-start' },
-  pressed: { opacity: 0.85 },
+  selected: { backgroundColor: colors.black },
+  secondary: { backgroundColor: colors.accentSoft },
+  destructive: { backgroundColor: colors.surface },
+  ghost: { minHeight: 44, paddingHorizontal: 0, borderRadius: 0, justifyContent: 'flex-start', gap: space(0.5) },
+  small: { minHeight: 32, paddingHorizontal: space(1.5), borderRadius: radius.pill },
+  pressed: { opacity: 0.8 },
+  ghostPressed: { opacity: 0.4 },
   dim: { opacity: 0.4 },
-  label: { ...type.body, fontFamily: fonts.bold, flexShrink: 1 },
+  label: { ...type.body, fontFamily: fonts.semibold, letterSpacing: -0.2, flexShrink: 1 },
+  smallLabel: { ...type.small, fontFamily: fonts.semibold },
+  ghostLabel: { ...type.body, fontFamily: fonts.medium, letterSpacing: -0.2 },
+  trailing: { fontSize: 22, lineHeight: 22 },
 });

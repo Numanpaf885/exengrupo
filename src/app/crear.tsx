@@ -42,7 +42,7 @@ export default function Crear() {
         returnKeyType="go"
         onSubmitEditing={() => void create()}
       />
-      <Text>Al crearlo recibes un código de 6 letras y un enlace para invitar a tu grupo.</Text>
+      <Text tone="secondary">Al crearlo recibes un código de 6 letras y un enlace para invitar a tu grupo.</Text>
       <Notice text={error} />
       <View style={styles.block}>
         <Button label={busy ? 'Creando…' : 'Crear espacio'} onPress={() => void create()} disabled={busy} />

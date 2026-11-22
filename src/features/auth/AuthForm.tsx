@@ -57,7 +57,7 @@ export function AuthForm({ mode, onSubmit, onSwitch, initialUsername = '' }: Pro
     <Screen>
       <HiddenAdminTitle />
       <Text variant="title">{activating ? 'Activar cuenta' : 'Entrar'}</Text>
-      {activating && <Text>Escribe tu usuario y el código de un solo uso que te dio el administrador, y elige tu contraseña.</Text>}
+      {activating && <Text tone="secondary">Escribe tu usuario y el código de un solo uso que te dio el administrador, y elige tu contraseña.</Text>}
       <View style={styles.fields}>
         <TextField
           label="Usuario"
@@ -108,7 +108,7 @@ export function AuthForm({ mode, onSubmit, onSwitch, initialUsername = '' }: Pro
           />
         )}
       </View>
-      {activating && <Text>La contraseña necesita al menos 8 caracteres. El código caduca a las 72 horas.</Text>}
+      {activating && <Text tone="secondary">La contraseña necesita al menos 8 caracteres. El código caduca a las 72 horas.</Text>}
       {error && (
         <FadeIn key={error} offset={8}>
           <Text variant="label" accessibilityRole="alert">
