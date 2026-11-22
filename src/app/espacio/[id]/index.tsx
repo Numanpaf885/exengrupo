@@ -2,6 +2,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Share, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { RoundUploadButton } from '@/components/RoundButton';
 import { FadeIn } from '@/components/FadeIn';
 import { Badge, Chip, initials } from '@/components/Badge';
 import { LoadingBar } from '@/components/LoadingBar';
@@ -13,8 +14,10 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { type SpaceDetail, type SpaceSummary, spacesApi } from '@/features/spaces/api';
 import { cachedPosts, cachedSpace, loadPosts, loadSpace, rememberPosts } from '@/features/spaces/cache';
 import { upsertPost } from '@/features/spaces/feed';
-import { dismissUpload, useUploads } from '@/features/spaces/uploads';
+import { pickPhoto } from '@/features/camera/pickPhoto';
+import { dismissUpload, startUpload, useUploads } from '@/features/spaces/uploads';
 import { displayAnswer } from '@/lib/answerDisplay';
+import { compressPhoto } from '@/lib/photo/compress';
 import { parseAnswerLine } from '@/lib/answerLines';
 import { realtimeConfigured, WEB_URL } from '@/lib/config';
 import type { PostView } from '@/lib/photo/upload';
@@ -99,6 +102,31 @@ export default function Espacio() {
   const [notFound, setNotFound] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const uploads = useUploads(spaceId);
+
+  /** Send an existing photo (gallery / files) for answers, like one taken with the camera. */
+  const uploadPhoto = async () => {
+    if (!token) return;
+    let photo;
+    try {
+      photo = await pickPhoto();
+    } catch {
+      return setError('No se pudo leer la foto. Prueba con otra.');
+    }
+    if (!photo) return;
+    const picked = photo;
+    startUpload(
+      spaceId,
+      async () => {
+        try {
+          return await compressPhoto(picked.uri, picked.width, picked.height);
+        } finally {
+          // Web: free the full-size image once the small JPEG exists.
+          if (picked.uri.startsWith('blob:')) URL.revokeObjectURL(picked.uri);
+        }
+      },
+      token,
+    );
+  };
 
   const setPosts = useCallback(
     (update: (prev: PostView[] | null) => PostView[]) =>
@@ -194,7 +222,10 @@ export default function Espacio() {
         )
       }
       footer={
-        <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} flex large />
+        <>
+          <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} flex large />
+          <RoundUploadButton label="Subir foto" onPress={() => void uploadPhoto()} disabled={!space} />
+        </>
       }
     >
       <View style={styles.titleBlock}>

@@ -339,6 +339,10 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   a second), then the camera closes and the upload continues in the background
   (`startUpload`, rows show "Enviando y analizando…"). (Compressing after the camera
   had closed stopped Android photos from being sent, 2026-11-22.)
+- "Subir foto" (user request 2026-11-22): a round tinted button next to "Tomar foto"
+  in the space footer (`RoundUploadButton`, same 64 px height; 40 px in the desktop
+  toolbar) sends an existing photo for answers: `pickPhoto()` (gallery on Android,
+  file picker on web/iPhone) → `compressPhoto` → `startUpload`, same pipeline as the camera.
 - Android + phone camera app: MIUI often closes exengrupo while the camera app is
   open. The space id is kept in SecureStore before launching it and
   `RecoverPendingPhoto` (root layout) sends the photo from
