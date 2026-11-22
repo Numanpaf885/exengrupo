@@ -466,6 +466,16 @@ The release APK is signed with a keystore from repository secrets:
 debug key and names the artifact `exengrupo-<run>-debugkey`. versionCode = the
 GitHub run number, so each build installs over the previous one.
 
+### In-app updates (Android, added 2026-11-22)
+
+- Sideloaded APKs can't update silently (Android always asks the user). On start
+  and on return to the foreground (≤ once an hour) the app reads the public
+  `releases/latest` from the GitHub API; if its `build-N` is newer than this APK's
+  `EXPO_PUBLIC_BUILD_NUMBER` (set by CI = run number = versionCode), home and the
+  sign-in screen show "Nueva versión disponible" (`src/features/update/`). "Actualizar"
+  opens the APK download; Android then installs it over the app (data kept, same key).
+  Pure logic in `src/lib/update/version.ts`. Web: no-op (the site is always current).
+
 ### APK downloads (GitHub Releases)
 
 Every successful build on `main` publishes a GitHub Release `build-<run number>`

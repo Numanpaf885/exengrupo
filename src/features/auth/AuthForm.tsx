@@ -3,6 +3,7 @@ import { StyleSheet, type TextInputInstance, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { FadeIn } from '@/components/FadeIn';
 import { HiddenAdminTitle } from '@/components/HiddenAdminTitle';
+import { UpdateBanner } from '@/features/update/UpdateBanner';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { TextField } from '@/components/TextField';
@@ -56,6 +57,7 @@ export function AuthForm({ mode, onSubmit, onSwitch, initialUsername = '' }: Pro
   return (
     <Screen narrow>
       <HiddenAdminTitle />
+      <UpdateBanner />
       <Text variant="title">{activating ? 'Activar cuenta' : 'Entrar'}</Text>
       {activating && <Text tone="secondary">Escribe tu usuario y el código de un solo uso que te dio el administrador, y elige tu contraseña.</Text>}
       <View style={styles.fields}>
