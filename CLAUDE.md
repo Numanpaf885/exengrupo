@@ -335,6 +335,9 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Camera: full screen, never scrolls (`src/features/camera/CameraChrome.tsx`):
   top bar (Volver + lens status), preview fills the middle, shutter + "Cámara del
   teléfono" at the bottom, white flash + haptic tick on capture (expo-haptics).
+  Silent: `enableShutterSound: false` on every Android capture (user request
+  2026-11-22; Android may still force it where the law requires, e.g. Japan/Korea).
+  The app plays no other sounds.
   The photo is compressed on the camera screen first ("Preparando la foto…", about
   a second), then the camera closes and the upload continues in the background
   (`startUpload`, rows show "Enviando y analizando…"). (Compressing after the camera

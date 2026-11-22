@@ -48,7 +48,7 @@ export function PhotoCapture({ onPhoto, onBack, spaceId, busy, notice }: Props) 
     setError(null);
     chrome.current?.flash();
     try {
-      const file = await photoOutput.capturePhotoToFile({ flashMode: 'off' }, {});
+      const file = await photoOutput.capturePhotoToFile({ flashMode: 'off', enableShutterSound: false }, {});
       onPhoto({
         uri: fileUri(file.filePath),
         width: file.width,

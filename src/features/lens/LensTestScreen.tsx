@@ -86,7 +86,7 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const file = await photoOutput.capturePhotoToFile({ flashMode: 'off' }, {});
+      const file = await photoOutput.capturePhotoToFile({ flashMode: 'off', enableShutterSound: false }, {});
       setPhoto({
         uri: fileUri(file.filePath),
         width: file.width,
