@@ -44,7 +44,12 @@ export function useAppUpdate(): AvailableUpdate | null {
     listeners.add(setUpdate);
     void check();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void check();
+      // "Más tarde" only lasts while the app stays open: reopening shows the card again.
+      if (state === 'background') dismissedBuild = 0;
+      if (state === 'active') {
+        emit();
+        void check();
+      }
     });
     return () => {
       listeners.delete(setUpdate);
@@ -54,7 +59,7 @@ export function useAppUpdate(): AvailableUpdate | null {
   return update;
 }
 
-/** "Más tarde": hide this build's banner until a newer one appears. */
+/** "Más tarde": hide the card until the app is opened again (or a newer build appears). */
 export function dismissUpdate(build: number): void {
   dismissedBuild = build;
   emit();
