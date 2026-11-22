@@ -16,6 +16,7 @@ import { normalizePrivateKey, serviceAccountTokenSource, SheetsClient } from './
 import { r2Storage } from './storage';
 import { sheetsTable } from './table';
 import { sheetsUserStore } from './users';
+import { openRouterCredits } from './usage';
 
 export const SERVER_ERROR = 'Error del servidor. Prueba de nuevo.';
 
@@ -133,6 +134,7 @@ export function adminDeps(): AdminDeps {
     settings: settings(),
     env: cleanEnv(),
     testKey: (id, key, model) => testProviderKey(id, key, model),
+    openRouterCredits: (key) => openRouterCredits(key),
   };
 }
 

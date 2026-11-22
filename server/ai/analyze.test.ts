@@ -27,7 +27,11 @@ describe('analyzePhoto (preference order, 2 at a time)', () => {
   it('merges the two most preferred providers', async () => {
     const third = vi.fn(ok('groq', O));
     const out = await analyzePhoto([ok('claude', G), ok('gemini', Q), third], 'b64');
-    expect(out).toEqual({ status: 'done', answer: '1.a  2.b/c ?', models: 'claude:claude-m, gemini:gemini-m' });
+    expect(out).toEqual({
+      status: 'done',
+      answer: '1.a  2.b/c ?',
+      models: 'claude:claude-m, gemini:gemini-m | by 1:claude+gemini 2:claude=b,gemini=c',
+    });
     expect(third).not.toHaveBeenCalled();
   });
 
@@ -35,27 +39,29 @@ describe('analyzePhoto (preference order, 2 at a time)', () => {
     const fb = vi.fn(ok('groq', O));
     const out = await analyzePhoto([ok('claude', G), limited('gemini', 30), fb], 'b64');
     expect(out.answer).toBe('1.a/d ?  2.b');
-    expect(out.models).toBe('claude:claude-m, groq:groq-m');
+    expect(out.models.split(' | ')[0]).toBe('claude:claude-m, groq:groq-m');
     expect(fb).toHaveBeenCalledTimes(1);
   });
 
   it('fills both slots from the queue when both favourites fail', async () => {
     const out = await analyzePhoto([broken('claude'), limited('gemini'), ok('groq', G), ok('openrouter', O)], 'b64');
-    expect(out).toEqual({ status: 'done', answer: '1.a/d ?  2.b', models: 'groq:groq-m, openrouter:openrouter-m' });
+    expect(out).toMatchObject({ status: 'done', answer: '1.a/d ?  2.b' });
+    expect(out.models.split(' | ')[0]).toBe('groq:groq-m, openrouter:openrouter-m');
   });
 
   it('keeps going down the list until one works', async () => {
     const out = await analyzePhoto([ok('gemini', G), broken('groq'), broken('openrouter'), ok('claude', O)], 'b64');
-    expect(out.models).toBe('gemini:gemini-m, claude:claude-m');
+    expect(out.models.split(' | ')[0]).toBe('gemini:gemini-m, claude:claude-m');
   });
 
   it('treats a reply that is not JSON as a failure and falls back', async () => {
     const out = await analyzePhoto([ok('gemini', 'Lo siento'), ok('groq', Q), ok('openrouter', O)], 'b64');
-    expect(out).toEqual({ status: 'done', answer: '1.d/a ?  2.c', models: 'openrouter:openrouter-m, groq:groq-m' });
+    expect(out).toMatchObject({ status: 'done', answer: '1.d/a ?  2.c' });
+    expect(out.models.split(' | ')[0]).toBe('openrouter:openrouter-m, groq:groq-m');
   });
 
   it('works with a single configured provider', async () => {
-    expect(await analyzePhoto([ok('groq', Q)], 'b64')).toEqual({ status: 'done', answer: '1.a  2.c', models: 'groq:groq-m' });
+    expect(await analyzePhoto([ok('groq', Q)], 'b64')).toEqual({ status: 'done', answer: '1.a  2.c', models: 'groq:groq-m | by 1:groq 2:groq' });
   });
 
   it('starts no new fallback after the deadline', async () => {

@@ -1,4 +1,4 @@
-/** Hidden admin panel (tap the "exengrupo" title 7 times). Own password: ADMIN_PASSWORD in Vercel. */
+/** Hidden admin panel (hold the "exengrupo" title 3 s, or tap it 7 times). Own password: ADMIN_PASSWORD in Vercel. */
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -9,10 +9,11 @@ import { Text } from '@/components/Text';
 import { TextField } from '@/components/TextField';
 import { adminApi, getAdminToken, setAdminToken } from '@/features/admin/api';
 import { KeysPanel } from '@/features/admin/KeysPanel';
+import { UsagePanel } from '@/features/admin/UsagePanel';
 import { UsersPanel } from '@/features/admin/UsersPanel';
 import { space } from '@/theme/tokens';
 
-type Tab = 'users' | 'keys';
+type Tab = 'users' | 'keys' | 'usage';
 
 export default function Admin() {
   const router = useRouter();
@@ -72,11 +73,18 @@ export default function Admin() {
       <View style={styles.tabs}>
         <Button label="Usuarios" kind={tab === 'users' ? 'selected' : 'secondary'} onPress={() => setTab('users')} />
         <Button label="Claves IA" kind={tab === 'keys' ? 'selected' : 'secondary'} onPress={() => setTab('keys')} />
+        <Button label="Uso" kind={tab === 'usage' ? 'selected' : 'secondary'} onPress={() => setTab('usage')} />
       </View>
-      {tab === 'users' ? <UsersPanel onSessionEnded={sessionEnded} /> : <KeysPanel onSessionEnded={sessionEnded} />}
+      {tab === 'users' ? (
+        <UsersPanel onSessionEnded={sessionEnded} />
+      ) : tab === 'keys' ? (
+        <KeysPanel onSessionEnded={sessionEnded} />
+      ) : (
+        <UsagePanel onSessionEnded={sessionEnded} />
+      )}
       <Button label="Salir del panel" kind="secondary" onPress={signOut} />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({ tabs: { gap: space(1) } });
+const styles = StyleSheet.create({ tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1) } });

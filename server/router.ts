@@ -71,7 +71,8 @@ export type AdminRoute =
   | { name: 'deleteUser'; userId: string }
   | { name: 'getKeys' }
   | { name: 'saveKey'; provider: string }
-  | { name: 'testKey'; provider: string };
+  | { name: 'testKey'; provider: string }
+  | { name: 'usage' };
 
 export function adminPath(url: URL): string[] {
   const raw = url.searchParams.get('__path') ?? url.pathname.replace(/^\/api\/admin\/?/, '');
@@ -87,6 +88,7 @@ export function matchAdminRoute(method: string, seg: string[]): AdminRoute | { n
   if (seg.length === 2 && a === 'users') return pick({ DELETE: { name: 'deleteUser', userId: b } });
   if (seg.length === 3 && a === 'users' && c === 'reset') return pick({ POST: { name: 'resetUser', userId: b } });
   if (seg.length === 1 && a === 'keys') return pick({ GET: { name: 'getKeys' } });
+  if (seg.length === 1 && a === 'usage') return pick({ GET: { name: 'usage' } });
   if (seg.length === 2 && a === 'keys') return pick({ PUT: { name: 'saveKey', provider: b } });
   if (seg.length === 3 && a === 'keys' && c === 'test') return pick({ POST: { name: 'testKey', provider: b } });
   return { name: 'notFound' };
