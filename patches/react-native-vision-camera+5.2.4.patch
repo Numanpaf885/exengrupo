@@ -1,0 +1,27 @@
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt
+index a384e82..8bba499 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt
+@@ -163,7 +163,9 @@ class HybridPhotoOutput(
+ 
+       // 1. Get settings
+       val isMirrored = shouldMirror()
+-      val enableShutterSound = (settings.enableShutterSound ?: true) || CameraInfo.mustPlayShutterSound()
++      // exengrupo patch: honour enableShutterSound even where the phone reports the
++      // sound as mandatory (Xiaomi/MIUI does, which made the click play in silent mode).
++      val enableShutterSound = settings.enableShutterSound ?: true
+       imageCapture.flashMode = settings.flashMode?.toFlashMode() ?: ImageCapture.FLASH_MODE_OFF
+       val location =
+         if (settings.location != null) {
+@@ -230,8 +232,9 @@ class HybridPhotoOutput(
+ 
+       // 1. Get settings
+       val isMirrored = shouldMirror()
+-      val enableShutterSound =
+-        (settings.enableShutterSound ?: true) || CameraInfo.mustPlayShutterSound()
++      // exengrupo patch: honour enableShutterSound even where the phone reports the
++      // sound as mandatory (Xiaomi/MIUI does, which made the click play in silent mode).
++      val enableShutterSound = settings.enableShutterSound ?: true
+       imageCapture.flashMode = settings.flashMode?.toFlashMode() ?: ImageCapture.FLASH_MODE_OFF
+       val location =
+         if (settings.location != null) {
