@@ -31,6 +31,7 @@ import { encryptSecret } from './secretbox';
 import { signToken, verifyToken } from './session';
 import type { SettingsStore } from './settings';
 import { isTrue, TRUE } from './table';
+import { type OpenRouterCredits, usageStats } from './usage';
 
 export const ADMIN_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -39,6 +40,8 @@ export interface AdminDeps extends DataDeps {
   settings: SettingsStore;
   env: Record<string, string | undefined>;
   testKey: (id: ProviderId, key: string, model: string) => Promise<KeyTest>;
+  /** Free OpenRouter key-info lookup (credits used). */
+  openRouterCredits?: (key: string) => Promise<OpenRouterCredits | null>;
 }
 
 export const ADMIN_MSG = {
@@ -213,4 +216,20 @@ export async function testKey(deps: AdminDeps, id: string, body: unknown): Promi
   const model = typeof b.model === 'string' && b.model.trim() ? b.model.trim() : (current?.model ?? '');
   if (!key) return fail(400, ADMIN_MSG.noKey);
   return { status: 200, body: await deps.testKey(id, key, model) };
+}
+
+// ---- AI usage ------------------------------------------------------------------
+
+/** Counts from the posts tab, plus OpenRouter's credit use when it has a key. */
+export async function getUsage(deps: AdminDeps): Promise<Result> {
+  const [rows, settings] = await Promise.all([deps.posts.list(), deps.settings.getAll()]);
+  const stats = usageStats(
+    rows.map((r) => r.value),
+    deps.now(),
+  );
+  const resolved = resolveProviders(settings, deps.env, deps.secret);
+  const openrouter = resolved.find((r) => r.id === 'openrouter');
+  const credits = openrouter?.key && deps.openRouterCredits ? await deps.openRouterCredits(openrouter.key) : null;
+  const configured = Object.fromEntries(resolved.map((r) => [r.id, !!r.key]));
+  return { status: 200, body: { ...stats, configured, openrouter_credits: credits } };
 }

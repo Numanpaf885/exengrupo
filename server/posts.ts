@@ -5,6 +5,7 @@
 import type { Result } from './auth';
 import type { AiOutcome } from './ai/analyze';
 import { AI_FAILED } from './ai/answers';
+import { answerLabels } from './ai/sources';
 import { authenticate, type DataDeps, fail, isResult, iso, membership } from './context';
 import type { Broadcaster } from './realtime';
 import { POST_DONE, POST_ERROR, POST_PROCESSING, type PostRecord } from './schema';
@@ -35,6 +36,8 @@ export interface PostView {
   username: string;
   status: string;
   answer: string;
+  /** Which AI gave each answer, by question number ("Claude + Gemini", "Claude: b · Gemini: c"). */
+  labels: Record<string, string>;
   created_at: string;
 }
 
@@ -45,6 +48,7 @@ function toView(p: PostRecord, names: Map<string, string>): PostView {
     username: names.get(p.user_id) ?? '—',
     status: p.status,
     answer: p.answer,
+    labels: p.status === POST_DONE ? answerLabels(p.answer, p.models) : {},
     created_at: p.created_at,
   };
 }

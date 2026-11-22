@@ -7,6 +7,8 @@ export interface PostView {
   username: string;
   status: 'processing' | 'done' | 'error' | string;
   answer: string;
+  /** Which AI gave each answer, by question number (missing on old servers). */
+  labels?: Record<string, string>;
   created_at: string;
 }
 

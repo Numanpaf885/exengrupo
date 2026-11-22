@@ -34,6 +34,24 @@ export interface CodeResult {
   expires_at: string;
 }
 
+export interface UsageWindow {
+  day: number;
+  week: number;
+  total: number;
+}
+
+export interface UsageView {
+  photos: UsageWindow;
+  errors: UsageWindow;
+  quota: UsageWindow;
+  unreadable: UsageWindow;
+  with_references: UsageWindow;
+  providers: Array<UsageWindow & { id: ProviderView['id']; model: string; last_at: string }>;
+  daily: Array<{ date: string; photos: number }>;
+  configured: Record<string, boolean>;
+  openrouter_credits: { usage: number; limit: number | null; free_tier: boolean } | null;
+}
+
 const t = () => adminToken ?? undefined;
 
 export const adminApi = {
@@ -45,6 +63,7 @@ export const adminApi = {
   keys: () => api<{ providers: ProviderView[]; order: string[] }>('/api/admin/keys', { token: t() }),
   saveKey: (id: string, body: { key?: string; model?: string }) =>
     api<{ providers: ProviderView[]; order: string[] }>(`/api/admin/keys/${id}`, { method: 'PUT', body, token: t() }),
+  usage: () => api<UsageView>('/api/admin/usage', { token: t() }),
   testKey: (id: string, body: { key?: string; model?: string }) =>
     api<{ ok: boolean; message: string }>(`/api/admin/keys/${id}/test`, { method: 'POST', body, token: t() }),
 };

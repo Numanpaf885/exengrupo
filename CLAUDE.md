@@ -43,8 +43,10 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   there is no public sign-up. The admin creates a user and gets a one-time code
   (XXXX-XXXX-XXXX, 72 h, 5 tries, stored only as a keyed hash); the person opens
   "Tengo un código" (/activar), types username + code + a new password.
-- Admin panel (/admin): opened by tapping the big "exengrupo" title 7 times
-  within 4 s (home and sign-in screens); its own password ADMIN_PASSWORD (Vercel).
+- Admin panel (/admin): opened by HOLDING the big "exengrupo" title for 3 s, or
+  tapping it 7 times within 4 s (home and sign-in screens, app and web; a short
+  vibration confirms on Android); its own password ADMIN_PASSWORD (Vercel).
+  Tabs: Usuarios, Claves IA, Uso (AI usage).
   Users: create (shows the code once), new code (also signs the person out on
   every device), delete (can't sign in, leaves every space). Claves IA: add,
   change, remove and test (free endpoints, no tokens) the AI keys and model IDs,
@@ -82,8 +84,10 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   - Merge per question number. If both agree, show that answer. If they differ,
     show `b/c ?`. If only one model answered, show its answer. For open answers,
     use the first model's text with no flag.
-  - The display format is exactly like `1.a  2.c  3.b/c ?  4.V  5. El agua hierve a 100 °C.`
-    and nothing else: no explanations.
+  - The saved answer line is exactly like `1.a  2.c  3.b/c ?  4.V  5. El agua hierve a 100 °C.`
+    and nothing else: no explanations. The app shows it ONE ANSWER PER LINE
+    ("1. a", "2. c", "3. b/c ?", …) with the AI that gave each answer on the right
+    ("Claude + Gemini", "Claude: b · Gemini: c") — user decision 2026-11-22.
   - Unreadable photo → "No se lee bien, repite la foto". All providers out of
     quota → "Límite de IA alcanzado, prueba en X min" (X from the provider's
     retry info if it gives one, otherwise 5).
@@ -364,6 +368,21 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   `… | ref: file p12; notes.docx` (never shown). Without files nothing changes.
 - Providers are `VisionClient`s (`call({prompt, mime, data})`, image or PDF) built by
   `buildClients()`; `answerProvider()` turns one into the old `Provider`.
+
+### Which AI answered + AI usage (added 2026-11-22, user request)
+
+- `server/ai/sources.ts`: `mergeSources` follows the merge rules and is stored in the
+  fixed `posts.models` cell as an extra segment:
+  `claude:…, gemini:… | by 1:claude+gemini 2:claude=b,gemini=c | ref: …`.
+  `answerLabels()` turns it into `labels` on PostView (only for "done" posts); old
+  posts answered by a single model get that model's name. The other segments are
+  never sent to the app.
+- App: `src/lib/answerLines.ts` splits the line; the feed shows one answer per line
+  with its label (`AnswerList` in `espacio/[id]/index.tsx`); "b/c ?" in red.
+- Admin "Uso" tab (`GET /api/admin/usage`, `server/usage.ts`): photos, errors, quota
+  hits, unreadable and reference use in 24 h / 7 days / total, a 7-day bar chart,
+  answers per provider with its latest model, and OpenRouter credits (free
+  `/api/v1/key`). Gemini, Groq and Claude have no free usage API.
 
 ### Admin, invite-only accounts and AI keys (added 2026-11-22)
 

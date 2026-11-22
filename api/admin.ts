@@ -8,8 +8,9 @@
  *   GET    /api/admin/keys                   AI providers (key hints only), order
  *   PUT    /api/admin/keys/:provider         { key?, model? } save ("" clears)
  *   POST   /api/admin/keys/:provider/test    { key?, model? } free check
+ *   GET    /api/admin/usage                  AI usage counted from the posts tab
  */
-import { adminLogin, createUser, deleteUser, getKeys, listUsers, requireAdmin, resetUser, saveKey, testKey } from '../server/admin';
+import { adminLogin, createUser, deleteUser, getKeys, getUsage, listUsers, requireAdmin, resetUser, saveKey, testKey } from '../server/admin';
 import type { Result } from '../server/auth';
 import { adminDeps, readJson, respond } from '../server/http';
 import { adminPath, matchAdminRoute } from '../server/router';
@@ -40,6 +41,8 @@ async function dispatch(request: Request): Promise<Result> {
       return saveKey(deps, route.provider, await readJson(request));
     case 'testKey':
       return testKey(deps, route.provider, await readJson(request));
+    case 'usage':
+      return getUsage(deps);
   }
 }
 

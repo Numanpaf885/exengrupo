@@ -272,14 +272,15 @@ describe('end to end (mocked): upload → listo → a photo answer uses the chun
       expect(prompts[id][0]).toContain('101.325 Pa');
       expect(prompts[id][0]).toContain('sigue la referencia');
     }
-    expect(ctx.base.posts.rows[0].models).toBe('claude:claude-model, gemini:gemini-model | ref: apuntes.txt');
+    expect(ctx.base.posts.rows[0].models).toBe('claude:claude-model, gemini:gemini-model | by 1:claude+gemini | ref: apuntes.txt');
+    expect((post.body as { post: PostView }).post.labels).toEqual({ 1: 'Claude + Gemini' });
   });
 
   it('skips the transcription call when the space has no ready files', async () => {
     const calls: VisionInput[] = [];
     const client = fakeClient('gemini', true, () => ok('gemini', '[{"n":1,"type":"tf","answer":"V"}]'), calls);
     const outcome = await analyzeWithReferences('AAAA', { clients: [client], chunks: async () => [] });
-    expect(outcome).toEqual({ status: 'done', answer: '1.V', models: 'gemini:gemini-model' });
+    expect(outcome).toEqual({ status: 'done', answer: '1.V', models: 'gemini:gemini-model | by 1:gemini' });
     expect(calls).toHaveLength(1);
     expect(calls[0].prompt).not.toContain('Referencia');
   });

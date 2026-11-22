@@ -15,11 +15,46 @@ import { cachedPosts, cachedSpace, loadPosts, loadSpace, rememberPosts } from '@
 import { upsertPost } from '@/features/spaces/feed';
 import { dismissUpload, useUploads } from '@/features/spaces/uploads';
 import { displayAnswer } from '@/lib/answerDisplay';
+import { parseAnswerLine } from '@/lib/answerLines';
 import { realtimeConfigured, WEB_URL } from '@/lib/config';
 import type { PostView } from '@/lib/photo/upload';
 import { subscribeToSpace } from '@/lib/realtime';
 import { formatPostTime } from '@/lib/time';
 import { space as grid } from '@/theme/tokens';
+
+/**
+ * One answer per line ("1. a", "2. b", "3. b/c ?", "4. El corazón."), each with
+ * the AI that gave it on the right. Anything that isn't an answer line is shown as is.
+ */
+function AnswerList({ answer, labels }: { answer: string; labels: Record<string, string> }) {
+  const items = parseAnswerLine(answer);
+  if (!items) {
+    return (
+      <Text variant="answer" selectable style={keepSpaces}>
+        {displayAnswer(answer)}
+      </Text>
+    );
+  }
+  return (
+    <View style={styles.answers}>
+      {items.map((item) => (
+        <View key={item.n} style={styles.answerRow}>
+          <Text variant="title" tone="secondary" style={styles.answerNumber}>
+            {`${item.n}.`}
+          </Text>
+          <Text variant="title" tone={item.unsure ? 'accent' : 'primary'} selectable style={styles.answerText}>
+            {displayAnswer(item.unsure ? `${item.text} ?` : item.text)}
+          </Text>
+          {labels[item.n] ? (
+            <Text variant="caption" tone="secondary" style={styles.answerSource}>
+              {labels[item.n]}
+            </Text>
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 function PostItem({ post }: { post: PostView }) {
   return (
@@ -44,9 +79,7 @@ function PostItem({ post }: { post: PostView }) {
               {post.answer || 'No se pudo analizar la foto. Prueba de nuevo.'}
             </Text>
           ) : (
-            <Text variant="answer" selectable style={keepSpaces}>
-              {displayAnswer(post.answer)}
-            </Text>
+            <AnswerList answer={post.answer} labels={post.labels ?? {}} />
           )}
         </FadeIn>
       )}
@@ -239,6 +272,11 @@ const styles = StyleSheet.create({
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: grid(1.5) },
   feed: { gap: grid(1.5) },
   meta: { flexDirection: 'row', alignItems: 'center', gap: grid(1.5) },
+  answers: { gap: grid(1) },
+  answerRow: { flexDirection: 'row', alignItems: 'baseline', gap: grid(1) },
+  answerNumber: { minWidth: 36 },
+  answerText: { flex: 1 },
+  answerSource: { maxWidth: '45%', textAlign: 'right' },
   grow: { flex: 1 },
   more: { marginTop: 'auto', alignItems: 'center' },
 });

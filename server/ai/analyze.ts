@@ -15,6 +15,7 @@ import {
 } from './answers';
 import type { Provider, ProviderResult } from './providers';
 import { retryMinutes } from './retry';
+import { encodeSources, mergeSources } from './sources';
 
 export interface AiOutcome {
   status: 'done' | 'error';
@@ -68,5 +69,7 @@ export async function analyzePhoto(providers: Provider[], jpegBase64: string, op
   const merged = mergeAnswers(good[0].answers, good[1]?.answers ?? null);
   const models = good.map((g) => `${g.result.provider}:${g.result.model}`).join(', ');
   if (merged.length === 0) return { status: 'error', answer: UNREADABLE, models };
-  return { status: 'done', answer: formatAnswers(merged), models };
+  // Which AI gave each answer, shown next to it in the app.
+  const by = encodeSources(mergeSources(good[0].answers, good[1]?.answers ?? null, good[0].result.provider, good[1]?.result.provider));
+  return { status: 'done', answer: formatAnswers(merged), models: by ? `${models} | ${by}` : models };
 }
