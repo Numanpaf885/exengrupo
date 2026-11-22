@@ -77,6 +77,21 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
 
+      # Android App Links: links to exengrupo.vercel.app/unirse/… and /activar open the
+      # app only if the APK's signing certificate is listed in
+      # public/.well-known/assetlinks.json (served by Vercel). The fingerprint is public.
+      - name: Check App Links fingerprint
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          FP=$("$APKSIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk \
+            | grep -m1 'SHA-256 digest' | awk '{print toupper($NF)}' | sed 's/../&:/g; s/:$//')
+          echo "Signing certificate SHA-256: $FP"
+          if grep -q "$FP" public/.well-known/assetlinks.json; then
+            echo "OK: fingerprint is in assetlinks.json, links will open the app."
+          else
+            echo "::warning title=App Links::Add $FP to public/.well-known/assetlinks.json so links open the app."
+          fi
+
       - name: Upload APK
         uses: actions/upload-artifact@v5
         with:

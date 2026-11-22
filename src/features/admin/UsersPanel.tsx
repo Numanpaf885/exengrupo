@@ -10,10 +10,10 @@ import { WEB_URL } from '@/lib/config';
 import { confirmAction } from '@/lib/confirm';
 import { colors, rule, space } from '@/theme/tokens';
 import { type AdminUser, adminApi, type CodeResult } from './api';
-import { formatDateTime, inviteMessage, userStatusText } from './format';
+import { activationLink, formatDateTime, inviteMessage, userStatusText } from './format';
 
 function CodeCard({ result, onClose }: { result: CodeResult; onClose: () => void }) {
-  const link = `${WEB_URL}/activar`;
+  const link = activationLink(WEB_URL, result.user.username);
   const share = () =>
     void Share.share({ message: inviteMessage(result.user.username, result.code, link) }).catch(() => undefined);
   return (
