@@ -273,6 +273,12 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   `src/lib/photo/compress(.web).ts` → long edge ≤ 2000 px, JPEG, < 3 MB.
 - Upload: multipart field `photo` to `POST /api/spaces/:id/posts`; the camera
   screen hands it to `src/features/spaces/uploads.ts` and returns to the feed.
+- ANDROID GOTCHA (found 2026-11-22): in Expo SDK 58 the global `fetch` on native is
+  `expo/fetch`. It CANNOT send a FormData file part given as `{ uri, name, type }`
+  ("uri is not supported") and cannot read local `file://` URIs; it throws and the
+  app showed "Sin conexión". Native uploads and local file reads use React Native's
+  XMLHttpRequest instead (`src/lib/xhr.ts`: `xhrPostForm`, `readLocalBlob`). Web
+  keeps using fetch with real Blobs. Never `fetch(localUri)` in native code.
 - Server pipeline (`server/posts.ts`): R2 `spaces/{space_id}/{post_id}.jpg`
   (aws4fetch SigV4, `server/storage.ts`) → posts row `processing` → broadcast →
   AI → row `done`/`error` with the answer line and `models` → broadcast.

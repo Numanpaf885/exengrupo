@@ -1,4 +1,5 @@
 import { api, type ApiResult } from '../api';
+import { xhrPostForm } from '../xhr';
 import type { ReadyPhoto } from './types';
 
 export interface PostView {
@@ -14,12 +15,15 @@ export interface PostView {
 
 /** POST /api/spaces/:id/posts as multipart "photo". The reply includes the answer. */
 export function uploadPhoto(spaceId: string, photo: ReadyPhoto, token: string): Promise<ApiResult<{ post: PostView }>> {
+  const path = `/api/spaces/${encodeURIComponent(spaceId)}/posts`;
   const form = new FormData();
   if (photo.blob) {
+    // Web: a real Blob, sent with fetch.
     form.append('photo', photo.blob, 'foto.jpg');
-  } else {
-    // React Native's FormData accepts a file descriptor object.
-    form.append('photo', { uri: photo.uri, name: 'foto.jpg', type: 'image/jpeg' } as unknown as Blob);
+    return api<{ post: PostView }>(path, { method: 'POST', form, token });
   }
-  return api<{ post: PostView }>(`/api/spaces/${encodeURIComponent(spaceId)}/posts`, { method: 'POST', form, token });
+  // Android: a file on the phone. Only React Native's XHR can send a `{ uri }` part
+  // (Expo's fetch cannot and failed as "Sin conexión").
+  form.append('photo', { uri: photo.uri, name: 'foto.jpg', type: 'image/jpeg' } as unknown as Blob);
+  return xhrPostForm<{ post: PostView }>(path, form, token);
 }
