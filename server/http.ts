@@ -18,8 +18,18 @@ import { sheetsUserStore } from './users';
 
 export const SERVER_ERROR = 'Error del servidor. Prueba de nuevo.';
 
+/**
+ * Env var values with surrounding spaces and line breaks removed. Values pasted
+ * into Vercel with a trailing Enter otherwise break HTTP headers (R2 signing).
+ */
+export function cleanEnv(source: Record<string, string | undefined> = process.env): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(source)) out[k] = typeof v === 'string' ? v.trim() : v;
+  return out;
+}
+
 export function env(name: string): string {
-  const value = process.env[name];
+  const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing env var ${name}`);
   return value;
 }
@@ -80,7 +90,7 @@ export function postDeps(): PostDeps {
     }),
     // Keys/models from the admin panel win over Vercel's; order Claude, Gemini, Groq, OpenRouter.
     analyze: async (jpegBase64) => {
-      const resolved = resolveProviders(await settings().getAll(), process.env, data.secret);
+      const resolved = resolveProviders(await settings().getAll(), cleanEnv(), data.secret);
       // Keep the whole run inside Vercel's 60 s: no new fallback after this point.
       const fallbackDeadline = Date.now() + 60_000 - TIMEOUT_MS - 6_000;
       return analyzePhoto(buildProviders(resolved), jpegBase64, { fallbackDeadline });
@@ -93,9 +103,9 @@ export function postDeps(): PostDeps {
 export function adminDeps(): AdminDeps {
   return {
     ...dataDeps(),
-    adminPassword: process.env.ADMIN_PASSWORD || undefined,
+    adminPassword: process.env.ADMIN_PASSWORD?.trim() || undefined,
     settings: settings(),
-    env: process.env,
+    env: cleanEnv(),
     testKey: (id, key, model) => testProviderKey(id, key, model),
   };
 }

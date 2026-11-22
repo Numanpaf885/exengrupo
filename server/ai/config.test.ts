@@ -21,6 +21,11 @@ describe('resolveProviders', () => {
     expect(r[2]).toMatchObject({ key: 'groq-admin-key-1234', keySource: 'admin', model: 'groq-admin-model', modelSource: 'admin' });
   });
 
+  it('trims Vercel keys pasted with a line break', () => {
+    expect(resolveProviders({}, { GROQ_API_KEY: ' gsk_abc\n' }, SECRET)[2]).toMatchObject({ key: 'gsk_abc', keySource: 'vercel' });
+    expect(resolveProviders({}, { GROQ_API_KEY: ' \n' }, SECRET)[2]).toMatchObject({ key: null, keySource: 'none' });
+  });
+
   it('ignores a stored key it can no longer decrypt (secret changed)', () => {
     const settings = { gemini_api_key: encryptSecret('old', 'other-secret') };
     expect(resolveProviders(settings, {}, SECRET)[1]).toMatchObject({ key: null, keySource: 'none' });

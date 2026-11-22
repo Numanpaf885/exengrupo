@@ -53,7 +53,7 @@ export function resolveProviders(
 ): ResolvedProvider[] {
   return PROVIDER_IDS.map((id) => {
     const stored = settings[settingKey(id)] ? decryptSecret(settings[settingKey(id)], secret) : null;
-    const envKey = env[PROVIDER_ENV[id].key] || null;
+    const envKey = env[PROVIDER_ENV[id].key]?.trim() || null;
     const storedModel = settings[settingModel(id)]?.trim() || null;
     const envModel = env[PROVIDER_ENV[id].model]?.trim() || null;
     return {
