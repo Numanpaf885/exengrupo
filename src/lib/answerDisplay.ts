@@ -1,7 +1,8 @@
 /**
- * Display-only tweak of the saved answer line: keep "3.b/c ?" together on one
- * line (non-breaking space before "?"). The saved text keeps the exact format.
+ * Display-only tweaks of the saved answer line, so line breaks fall between
+ * answers: keep "3.b/c ?" together and a number with its unit ("100 °C",
+ * "25 %", "9,8 m/s²"). The saved text keeps the exact format.
  */
 export function displayAnswer(line: string): string {
-  return line.replace(/ \?/g, ' ?');
+  return line.replace(/ \?/g, ' ?').replace(/(\d) (?=(?:°[CFK]?|%|[a-zA-Zµ]{1,3}(?:\/[a-zA-Z]{1,3})?[²³]?)(?:[\s.,;)]|$))/g, '$1 ');
 }
