@@ -336,8 +336,12 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   top bar (Volver + lens status), preview fills the middle, shutter + "Cámara del
   teléfono" at the bottom, white flash + haptic tick on capture (expo-haptics).
   Silent: `enableShutterSound: false` on every Android capture (user request
-  2026-11-22; Android may still force it where the law requires, e.g. Japan/Korea).
-  The app plays no other sounds.
+  2026-11-22). VisionCamera ORs it with `CameraInfo.mustPlayShutterSound()`, which
+  Xiaomi/MIUI reports as true, so the click still played even in silent mode:
+  `patches/react-native-vision-camera+5.2.4.patch` (patch-package, applied by the
+  `postinstall` script) makes it honour `enableShutterSound` only. Re-create the patch
+  if VisionCamera is upgraded. The app plays no other sounds. The phone's own camera
+  app ("Usar cámara del teléfono") has its own sound setting.
   The photo is compressed on the camera screen first ("Preparando la foto…", about
   a second), then the camera closes and the upload continues in the background
   (`startUpload`, rows show "Enviando y analizando…"). (Compressing after the camera
