@@ -5,11 +5,31 @@
   "buildCommand": "npx expo export -p web",
   "outputDirectory": "dist",
   "functions": {
-    "api/spaces.ts": { "maxDuration": 60 }
+    "api/spaces.ts": {
+      "maxDuration": 60
+    },
+    "api/admin.ts": {
+      "maxDuration": 30
+    }
   },
-  "crons": [{ "path": "/api/cron/heartbeat", "schedule": "17 6 * * *" }],
+  "crons": [
+    {
+      "path": "/api/cron/heartbeat",
+      "schedule": "17 6 * * *"
+    }
+  ],
   "rewrites": [
-    { "source": "/api/spaces/:path*", "destination": "/api/spaces?__path=:path*" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/spaces/:path*",
+      "destination": "/api/spaces?__path=:path*"
+    },
+    {
+      "source": "/api/admin/:path*",
+      "destination": "/api/admin?__path=:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

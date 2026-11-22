@@ -1,19 +1,16 @@
 /** Wiring between Vercel web-standard handlers and the testable handlers. */
 import bcrypt from 'bcryptjs';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import type { AdminDeps } from './admin';
 import { analyzePhoto } from './ai/analyze';
-import {
-  DEFAULT_MODELS,
-  geminiProvider,
-  groqProvider,
-  openRouterProvider,
-  type Provider,
-} from './ai/providers';
+import { buildProviders, resolveProviders, testProviderKey } from './ai/config';
+import { TIMEOUT_MS } from './ai/providers';
 import type { AuthDeps, Result } from './auth';
 import type { DataDeps } from './context';
 import type { PostDeps } from './posts';
 import { supabaseBroadcaster } from './realtime';
 import type { MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
+import { type SettingsStore, sheetsSettings } from './settings';
 import { normalizePrivateKey, serviceAccountTokenSource, SheetsClient } from './sheets';
 import { r2Storage } from './storage';
 import { sheetsTable } from './table';
@@ -37,6 +34,12 @@ function sheetsClient(): SheetsClient {
     sheets = new SheetsClient(env('SHEET_ID'), getToken);
   }
   return sheets;
+}
+
+let settingsStore: SettingsStore | null = null;
+function settings(): SettingsStore {
+  settingsStore ??= sheetsSettings(sheetsClient());
+  return settingsStore;
 }
 
 export function authDeps(): AuthDeps {
@@ -65,36 +68,35 @@ export function dataDeps(): DataDeps {
   };
 }
 
-const optional = (name: string): string | undefined => process.env[name] || undefined;
-
-/** A provider whose key isn't configured simply fails, so the fallback takes over. */
-const notConfigured =
-  (provider: string, model: string): Provider =>
-  async () => ({ ok: false, provider, model, rateLimited: false, error: 'not configured' });
-
 export function postDeps(): PostDeps {
-  const geminiModel = optional('GEMINI_MODEL') ?? DEFAULT_MODELS.gemini;
-  const groqModel = optional('GROQ_MODEL') ?? DEFAULT_MODELS.groq;
-  const openRouterModel = optional('OPENROUTER_MODEL') ?? DEFAULT_MODELS.openrouter;
-  const geminiKey = optional('GEMINI_API_KEY');
-  const groqKey = optional('GROQ_API_KEY');
-  const openRouterKey = optional('OPENROUTER_API_KEY');
-  const providers = {
-    first: geminiKey ? geminiProvider(geminiKey, geminiModel) : notConfigured('gemini', geminiModel),
-    second: groqKey ? groqProvider(groqKey, groqModel) : notConfigured('groq', groqModel),
-    fallback: openRouterKey ? openRouterProvider(openRouterKey, openRouterModel) : null,
-  };
+  const data = dataDeps();
   return {
-    ...dataDeps(),
+    ...data,
     storage: r2Storage({
       accountId: env('R2_ACCOUNT_ID'),
       bucket: env('R2_BUCKET'),
       accessKeyId: env('R2_ACCESS_KEY_ID'),
       secretAccessKey: env('R2_SECRET_ACCESS_KEY'),
     }),
-    analyze: (jpegBase64) => analyzePhoto(providers, jpegBase64),
+    // Keys/models from the admin panel win over Vercel's; order Claude, Gemini, Groq, OpenRouter.
+    analyze: async (jpegBase64) => {
+      const resolved = resolveProviders(await settings().getAll(), process.env, data.secret);
+      // Keep the whole run inside Vercel's 60 s: no new fallback after this point.
+      const fallbackDeadline = Date.now() + 60_000 - TIMEOUT_MS - 6_000;
+      return analyzePhoto(buildProviders(resolved), jpegBase64, { fallbackDeadline });
+    },
     broadcast: supabaseBroadcaster(env('SUPABASE_URL'), env('SUPABASE_SECRET_KEY')),
     log: (message) => console.error(message),
+  };
+}
+
+export function adminDeps(): AdminDeps {
+  return {
+    ...dataDeps(),
+    adminPassword: process.env.ADMIN_PASSWORD || undefined,
+    settings: settings(),
+    env: process.env,
+    testKey: (id, key, model) => testProviderKey(id, key, model),
   };
 }
 

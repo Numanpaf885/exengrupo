@@ -15,12 +15,14 @@ export type Provider = (jpegBase64: string) => Promise<ProviderResult>;
 
 /** Defaults, checked against each provider's official SDK / docs repo (Nov 2026). */
 export const DEFAULT_MODELS = {
+  claude: 'claude-opus-5-5',
   gemini: 'gemini-3.8-flash',
   groq: 'meta-llama/llama-4-scout-17b-16e-instruct',
   openrouter: 'google/gemma-3-27b-it:free',
 } as const;
 
-const TIMEOUT_MS = 40_000;
+/** Per call; analyzePhoto keeps the whole run inside the 60 s Vercel limit. */
+export const TIMEOUT_MS = 26_000;
 
 async function send(fetchImpl: FetchLike, url: string, init: RequestInit): Promise<Response> {
   return fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });

@@ -26,7 +26,7 @@ function nameFrom(body: unknown): string | null {
 }
 
 export async function listMySpaces(deps: DataDeps, auth: string | null): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const [spaces, members] = await Promise.all([deps.spaces.list(), deps.members.list()]);
   const active = members.filter((m) => !isTrue(m.value.removed));
@@ -46,7 +46,7 @@ export async function listMySpaces(deps: DataDeps, auth: string | null): Promise
 }
 
 export async function createSpace(deps: DataDeps, auth: string | null, body: unknown): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const raw = nameFrom(body);
   if (raw === null) return fail(400, 'Datos no válidos.');
@@ -84,7 +84,7 @@ export async function createSpace(deps: DataDeps, auth: string | null, body: unk
 }
 
 export async function joinSpace(deps: DataDeps, auth: string | null, body: unknown): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const raw = body && typeof body === 'object' ? (body as Record<string, unknown>).code : null;
   const code = typeof raw === 'string' ? normalizeJoinCode(raw) : null;
@@ -110,7 +110,7 @@ export async function joinSpace(deps: DataDeps, auth: string | null, body: unkno
 }
 
 export async function getSpace(deps: DataDeps, auth: string | null, spaceId: string): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;
@@ -137,7 +137,7 @@ export async function getSpace(deps: DataDeps, auth: string | null, spaceId: str
 }
 
 export async function renameSpace(deps: DataDeps, auth: string | null, spaceId: string, body: unknown) {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;
@@ -152,7 +152,7 @@ export async function renameSpace(deps: DataDeps, auth: string | null, spaceId: 
 }
 
 export async function deleteSpace(deps: DataDeps, auth: string | null, spaceId: string): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;
@@ -167,7 +167,7 @@ export async function removeMember(
   spaceId: string,
   userId: string,
 ): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;

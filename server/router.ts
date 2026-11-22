@@ -47,3 +47,33 @@ export function matchSpacesRoute(method: string, seg: string[]): RouteMatch {
   void d;
   return { name: 'notFound' };
 }
+
+/** /api/admin/* routes (one Vercel function, rewritten like /api/spaces). */
+export type AdminRoute =
+  | { name: 'login' }
+  | { name: 'listUsers' }
+  | { name: 'createUser' }
+  | { name: 'resetUser'; userId: string }
+  | { name: 'deleteUser'; userId: string }
+  | { name: 'getKeys' }
+  | { name: 'saveKey'; provider: string }
+  | { name: 'testKey'; provider: string };
+
+export function adminPath(url: URL): string[] {
+  const raw = url.searchParams.get('__path') ?? url.pathname.replace(/^\/api\/admin\/?/, '');
+  return raw.split('/').filter(Boolean).map((s) => decodeURIComponent(s));
+}
+
+export function matchAdminRoute(method: string, seg: string[]): AdminRoute | { name: 'notFound' } | { name: 'methodNotAllowed' } {
+  const m = method.toUpperCase();
+  const pick = (table: Record<string, AdminRoute>) => table[m] ?? ({ name: 'methodNotAllowed' } as const);
+  const [a, b, c] = seg;
+  if (seg.length === 1 && a === 'login') return pick({ POST: { name: 'login' } });
+  if (seg.length === 1 && a === 'users') return pick({ GET: { name: 'listUsers' }, POST: { name: 'createUser' } });
+  if (seg.length === 2 && a === 'users') return pick({ DELETE: { name: 'deleteUser', userId: b } });
+  if (seg.length === 3 && a === 'users' && c === 'reset') return pick({ POST: { name: 'resetUser', userId: b } });
+  if (seg.length === 1 && a === 'keys') return pick({ GET: { name: 'getKeys' } });
+  if (seg.length === 2 && a === 'keys') return pick({ PUT: { name: 'saveKey', provider: b } });
+  if (seg.length === 3 && a === 'keys' && c === 'test') return pick({ POST: { name: 'testKey', provider: b } });
+  return { name: 'notFound' };
+}

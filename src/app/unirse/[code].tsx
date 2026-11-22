@@ -33,7 +33,7 @@ export default function UnirseConEnlace() {
       <Screen>
         <Text variant="display">exengrupo</Text>
         <Text variant="title">Te invitaron a un espacio</Text>
-        <Text>Código {code}. Entra o crea una cuenta y te unirás al momento.</Text>
+        <Text>Código {code}. Entra, o activa tu cuenta con el código que te dio el administrador, y te unirás al momento.</Text>
         <View style={styles.block}>
           <Button
             label="Entrar"
@@ -43,11 +43,11 @@ export default function UnirseConEnlace() {
             }}
           />
           <Button
-            label="Crear cuenta"
+            label="Tengo un código"
             kind="secondary"
             onPress={() => {
               setPendingJoin(code);
-              router.replace('/register');
+              router.replace('/activar');
             }}
           />
         </View>

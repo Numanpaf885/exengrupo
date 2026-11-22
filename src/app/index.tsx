@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { HiddenAdminTitle } from '@/components/HiddenAdminTitle';
 import { ListRow } from '@/components/ListRow';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
@@ -43,7 +44,7 @@ export default function Home() {
 
   return (
     <Screen>
-      <Text variant="display">exengrupo</Text>
+      <HiddenAdminTitle />
 
       <View style={styles.block}>
         <Text variant="title">Tus espacios</Text>

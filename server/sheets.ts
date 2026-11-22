@@ -152,4 +152,24 @@ export class SheetsClient {
       body: JSON.stringify({ valueInputOption: 'RAW', data }),
     });
   }
+
+  /** Titles of the existing tabs (so a missing tab is never requested: that fails the call). */
+  async listTabs(): Promise<string[]> {
+    const data = (await this.call('?fields=sheets.properties.title')) as {
+      sheets?: Array<{ properties?: { title?: string } }>;
+    };
+    return (data.sheets ?? []).map((s) => s.properties?.title ?? '').filter(Boolean);
+  }
+
+  /** Adds a NEW tab with its row-1 headers. Only for tabs the user approved (e.g. "ajustes"). */
+  async createTab(title: string, headers: string[]): Promise<void> {
+    await this.call(':batchUpdate', {
+      method: 'POST',
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title } } }] }),
+    });
+    await this.call(`/values/${encodeURIComponent(`${title}!A1`)}?valueInputOption=RAW`, {
+      method: 'PUT',
+      body: JSON.stringify({ values: [headers] }),
+    });
+  }
 }
