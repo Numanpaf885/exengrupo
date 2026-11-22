@@ -256,9 +256,9 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   with header `apikey: SUPABASE_SECRET_KEY` (never Bearer: sb_ keys aren't JWTs),
   body `{post_id}` only. App: `@supabase/realtime-js` on a public channel with the
   publishable key (`src/lib/realtime.ts`), then fetches the post from /api.
-  Needs EXPO_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY (Vercel env for web; GitHub
-  repository Variables for the APK). Without them the feed refreshes on focus /
-  "Actualizar".
+  The public Supabase URL and publishable key are committed as defaults in
+  `src/lib/config.ts` (EXPO_PUBLIC_* env vars override them), so the APK needs no
+  GitHub Variables.
 - Heartbeat: Vercel cron `17 6 * * *` → `/api/cron/heartbeat` (Bearer
   CRON_SECRET) → reads the one row of `public.heartbeat` and PATCHes its
   `last_*`/`*ping*`/`*beat*`/`updated*` column (or another non-created timestamp,
