@@ -10,7 +10,7 @@ export function Badge({ text, round, tone = 'accent' }: { text: string; round?: 
       accessibilityElementsHidden
       importantForAccessibility="no"
     >
-      <Text style={[styles.text, { color: tone === 'accent' ? colors.accent : colors.secondary }]} numberOfLines={1}>
+      <Text style={[styles.text, { color: tone === 'accent' ? colors.accentText : colors.secondary }]} numberOfLines={1}>
         {text}
       </Text>
     </View>
@@ -27,7 +27,7 @@ export function initials(name: string): string {
 /** Small capsule status label. */
 export function Chip({ label, tone }: { label: string; tone: 'neutral' | 'success' | 'danger' }) {
   const bg = tone === 'success' ? colors.successSoft : tone === 'danger' ? colors.accentSoft : colors.fill;
-  const fg = tone === 'success' ? colors.success : tone === 'danger' ? colors.accent : colors.secondary;
+  const fg = tone === 'success' ? colors.success : tone === 'danger' ? colors.accentText : colors.secondary;
   return (
     <View style={[styles.chip, { backgroundColor: bg }]}>
       <Text style={[styles.chipText, { color: fg }]}>{label}</Text>

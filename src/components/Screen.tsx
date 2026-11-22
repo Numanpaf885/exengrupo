@@ -40,7 +40,7 @@ export function Screen({ children, onBack, headerRight, footer, onRefresh, refre
         keyboardDismissMode="on-drag"
         refreshControl={
           onRefresh ? (
-            <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} colors={[colors.accent]} tintColor={colors.secondary} />
+            <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} colors={[colors.accent]} progressBackgroundColor={colors.surface} tintColor={colors.secondary} />
           ) : undefined
         }
         contentContainerStyle={[
@@ -90,12 +90,12 @@ export function Screen({ children, onBack, headerRight, footer, onRefresh, refre
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  offline: { backgroundColor: colors.text, borderRadius: 12, paddingHorizontal: space(2), paddingVertical: space(1.5) },
+  offline: { backgroundColor: colors.fill, borderRadius: 12, paddingHorizontal: space(2), paddingVertical: space(1.5) },
   offlineText: { color: colors.white },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -4 },
-  backChevron: { fontSize: 34, lineHeight: 34, color: colors.accent, marginTop: -4, fontFamily: fonts.regular },
-  backLabel: { ...type.body, color: colors.accent, fontFamily: fonts.medium },
+  backChevron: { fontSize: 34, lineHeight: 34, color: colors.accentText, marginTop: -4, fontFamily: fonts.regular },
+  backLabel: { ...type.body, color: colors.accentText, fontFamily: fonts.medium },
   headerRight: { flexDirection: 'row', gap: space(2.5) },
   content: { paddingHorizontal: space(2), gap: space(2), alignItems: 'stretch', flexGrow: 1 },
   body: { gap: space(3) },
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: space(2),
     paddingTop: space(1.5),
-    backgroundColor: 'rgba(249, 249, 251, 0.94)',
+    backgroundColor: colors.bar,
     borderTopWidth: rule.width,
     borderTopColor: rule.color,
     flexDirection: 'row',

@@ -1,40 +1,47 @@
 import * as Haptics from 'expo-haptics';
 import { Animated, Platform, Pressable, StyleSheet } from 'react-native';
-import { colors } from '@/theme/tokens';
+import { colors, fonts, radius } from '@/theme/tokens';
+import { Text } from './Text';
 import { usePressScale } from './usePressScale';
 
-/** Round camera shutter (white ring, white disc); shrinks while pressed and ticks the phone. */
+/** A short vibration tick when a photo is taken (Android app only). */
+export function shutterTick(): void {
+  if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+}
+
+/** Long, full-width white capsule "Tomar foto": easy to hit with a thumb. Shrinks while pressed. */
 export function Shutter({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) {
-  const press = usePressScale(0.88);
+  const press = usePressScale(0.96);
   return (
-    <Animated.View style={[press.style, disabled && { opacity: 0.4 }]}>
+    <Animated.View style={[styles.wrap, press.style, disabled && { opacity: 0.4 }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Disparar"
+        accessibilityLabel="Tomar foto"
         disabled={disabled}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
         onPress={() => {
-          if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+          shutterTick();
           onPress();
         }}
-        style={styles.outer}
+        style={({ pressed }) => [styles.button, pressed && { opacity: 0.85 }]}
       >
-        <Animated.View style={styles.inner} />
+        <Text style={styles.label}>Tomar foto</Text>
       </Pressable>
     </Animated.View>
   );
 }
 
+export const SHUTTER_HEIGHT = 72;
+
 const styles = StyleSheet.create({
-  outer: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-    borderWidth: 4,
-    borderColor: colors.white,
-    justifyContent: 'center',
+  wrap: { alignSelf: 'stretch' },
+  button: {
+    height: SHUTTER_HEIGHT,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  inner: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.white },
+  label: { color: colors.black, fontFamily: fonts.bold, fontSize: 20, lineHeight: 24, letterSpacing: -0.3 },
 });

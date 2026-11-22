@@ -16,8 +16,9 @@ export function TextField({ label, ...props }: TextInputProps & { label: string;
         autoCapitalize="none"
         autoCorrect={false}
         placeholderTextColor={colors.secondary}
-        selectionColor={colors.accent}
-        cursorColor={colors.accent}
+        selectionColor={colors.accentText}
+        keyboardAppearance="dark"
+        cursorColor={colors.accentText}
         {...props}
         onFocus={(e) => {
           setFocused(true);
@@ -27,7 +28,7 @@ export function TextField({ label, ...props }: TextInputProps & { label: string;
           setFocused(false);
           props.onBlur?.(e);
         }}
-        style={[styles.input, { borderColor: focused ? colors.accent : 'transparent' }, webNoOutline]}
+        style={[styles.input, { borderColor: focused ? colors.accentText : 'transparent' }, webNoOutline]}
       />
     </View>
   );

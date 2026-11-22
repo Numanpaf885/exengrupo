@@ -19,7 +19,7 @@ export function LoadingBar({ label, inverted }: { label: string; inverted?: bool
     return () => loop.stop();
   }, [width, x]);
   const block = Math.max(space(4), width / 3);
-  const fg = inverted ? colors.white : colors.accent;
+  const fg = inverted ? colors.white : colors.accentText;
   return (
     <View
       accessibilityRole="progressbar"

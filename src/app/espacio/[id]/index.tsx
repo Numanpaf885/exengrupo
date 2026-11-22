@@ -161,7 +161,7 @@ export default function Espacio() {
         )
       }
       footer={
-        <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} flex />
+        <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} flex large />
       }
     >
       <View style={styles.titleBlock}>

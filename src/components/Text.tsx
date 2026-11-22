@@ -15,7 +15,7 @@ export function Text({ variant = 'body', tone = 'primary', style, ...props }: Te
 const tones = StyleSheet.create({
   primary: { color: colors.text },
   secondary: { color: colors.secondary },
-  accent: { color: colors.accent },
+  accent: { color: colors.accentText },
   success: { color: colors.success },
   onAccent: { color: colors.onAccent },
 });

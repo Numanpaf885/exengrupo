@@ -32,7 +32,7 @@ function RootNavigator() {
         <Stack.Screen name="espacio/[id]/index" />
         <Stack.Screen
           name="espacio/[id]/camara"
-          options={{ animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.text } }}
+          options={{ animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.black } }}
         />
         <Stack.Screen name="espacio/[id]/miembros" />
         <Stack.Screen name="espacio/[id]/archivos" />
@@ -55,7 +55,7 @@ export default function RootLayout() {
   if (!loaded) return blank;
   return (
     <AuthProvider>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <RootNavigator />
     </AuthProvider>
   );

@@ -227,11 +227,11 @@ const styles = StyleSheet.create({
     paddingTop: space(1),
     paddingBottom: space(2),
   },
-  cameraBox: { width: '100%', aspectRatio: 3 / 4, backgroundColor: colors.text },
+  cameraBox: { width: '100%', aspectRatio: 3 / 4, backgroundColor: colors.black },
   shutterBar: {
-    backgroundColor: colors.text,
-    paddingVertical: space(2),
+    backgroundColor: colors.black,
+    padding: space(2),
     alignItems: 'center',
   },
-  photo: { width: '100%', backgroundColor: colors.text },
+  photo: { width: '100%', backgroundColor: colors.black },
 });

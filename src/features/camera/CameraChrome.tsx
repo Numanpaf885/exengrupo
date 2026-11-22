@@ -9,7 +9,7 @@ import { forwardRef, type ReactNode, useImperativeHandle, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FadeIn } from '@/components/FadeIn';
-import { Shutter } from '@/components/Shutter';
+import { SHUTTER_HEIGHT, Shutter, shutterTick } from '@/components/Shutter';
 import { Text } from '@/components/Text';
 import { colors, radius, space } from '@/theme/tokens';
 import { nativeDriver, reducedMotion } from '@/theme/motion';
@@ -57,6 +57,11 @@ export const CameraChrome = forwardRef<CameraChromeHandle, Props>(function Camer
 ) {
   const insets = useSafeAreaInsets();
   const flash = useRef(new Animated.Value(0)).current;
+  const shoot = () => {
+    if (!onShutter) return;
+    shutterTick();
+    onShutter();
+  };
   useImperativeHandle(ref, () => ({
     flash() {
       if (reducedMotion()) return;
@@ -81,6 +86,16 @@ export const CameraChrome = forwardRef<CameraChromeHandle, Props>(function Camer
 
       <View style={styles.preview}>
         {preview}
+        {/* Tapping anywhere on the picture also takes the photo. */}
+        {onShutter && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tomar foto tocando la imagen"
+            disabled={shutterDisabled || busy}
+            onPress={shoot}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.flash, { opacity: flash }]} />
       </View>
 
@@ -91,24 +106,24 @@ export const CameraChrome = forwardRef<CameraChromeHandle, Props>(function Camer
               {message}
             </Text>
           </FadeIn>
+        ) : onShutter ? (
+          <Text variant="caption" style={styles.message}>
+            Toca la imagen o el botón para tomar la foto.
+          </Text>
         ) : null}
         {onSystemCamera && (
           <View style={styles.center}>
             <Pill label="Usar cámara del teléfono" onPress={onSystemCamera} disabled={busy} />
           </View>
         )}
-        <View style={styles.controls}>
-          <View style={styles.side} />
-          {onShutter ? <Shutter onPress={onShutter} disabled={shutterDisabled || busy} /> : <View style={styles.shutterSpace} />}
-          <View style={[styles.side, styles.sideRight]} />
-        </View>
+        {onShutter ? <Shutter onPress={onShutter} disabled={shutterDisabled || busy} /> : <View style={styles.shutterSpace} />}
       </View>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.text },
+  root: { flex: 1, backgroundColor: colors.black },
   top: {
     paddingHorizontal: space(2),
     paddingBottom: space(1),
@@ -119,11 +134,8 @@ const styles = StyleSheet.create({
   preview: { flex: 1, overflow: 'hidden', justifyContent: 'center' },
   flash: { backgroundColor: colors.white },
   bottom: { paddingHorizontal: space(2), paddingTop: space(2), gap: space(2) },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: space(1) },
-  side: { flex: 1, alignItems: 'flex-start' },
   center: { alignItems: 'center' },
-  sideRight: { alignItems: 'flex-end' },
-  shutterSpace: { width: 78, height: 78 },
+  shutterSpace: { height: SHUTTER_HEIGHT },
   pill: {
     minHeight: 36,
     paddingHorizontal: space(1.5),

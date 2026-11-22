@@ -87,14 +87,15 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   - Unreadable photo → "No se lee bien, repite la foto". All providers out of
     quota → "Límite de IA alcanzado, prueba en X min" (X from the provider's
     retry info if it gives one, otherwise 5).
-- Design (user decision 2026-11-22, replaces the original Swiss style): a modern
-  Apple-style interface. Grouped light-gray background #F2F2F7 with white rounded
-  cards and inset grouped lists, hairline separators, large titles, "‹ Atrás" nav,
+- Design (user decisions 2026-11-22, replace the original Swiss style): a modern
+  Apple-style interface, DARK ONLY (no light theme, no toggle). Pure-black grouped
+  background #000000 with #1C1C1E rounded cards and inset grouped lists, hairline separators, large titles, "‹ Atrás" nav,
   a frosted pinned bottom bar, capsule chips, soft banners. One tint colour, the
-  exengrupo red #DA291C, for actions and links (filled = main action, tinted =
-  secondary). Inter (400/500/600/700) on an 8 px grid (4 px half-steps), body 17,
-  large bold type for answers, iOS-camera chrome (white round shutter, translucent
-  pills). No gradients, no heavy shadows, no emoji, no dark mode. All UI text in Spanish.
+  exengrupo red #DA291C, for filled buttons (red text/links use #FF6259 for
+  contrast on dark; tinted = secondary). Inter (400/500/600/700) on an 8 px grid (4 px half-steps), body 17,
+  large bold type for answers, iOS-camera chrome (a long full-width white "Tomar
+  foto" capsule; tapping the preview also takes the photo; translucent pills).
+  No gradients, no heavy shadows, no emoji. All UI text in Spanish.
 - Camera: MUST open at 0.5x (ultra-wide) when the phone exposes that lens. If it
   doesn't, use the widest lens available and show "0.5x no disponible".
 
@@ -154,7 +155,7 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 ## Rules
 
 - Build only what the brief asks. No extra features, analytics, ads, push
-  notifications, dark mode or extra services.
+  notifications or extra services. (The app is dark-only by user decision.)
 - Add only the dependencies a slice needs, and list each new one in the slice
   report with a one-line reason.
 - Unit-test the pure logic (answer parsing, merging, formatting, join-code

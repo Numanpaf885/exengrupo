@@ -1,28 +1,33 @@
 /**
- * Design tokens (Apple-style redesign, user decision 2026-11-22; replaces the
- * original Swiss tokens). Grouped light-gray background with white rounded
- * cards, Inter (close to SF Pro) in four weights, one tint colour — the
- * exengrupo red — for actions, and an 8 px grid (4 px half-steps allowed).
+ * Design tokens: Apple-style dark interface (user decisions 2026-11-22: the
+ * Swiss style was replaced by an Apple-style design, then the app went dark).
+ * Pure-black grouped background with dark-gray rounded cards, white text, Inter
+ * in four weights, one tint colour — the exengrupo red — and an 8 px grid.
+ * Text colours keep at least 4.5:1 contrast on both background and cards.
  */
 import { StyleSheet } from 'react-native';
 
 export const colors = {
-  /** Grouped background (iOS systemGroupedBackground). */
-  background: '#F2F2F7',
-  /** Cards, cells, inputs. */
-  surface: '#FFFFFF',
-  text: '#000000',
-  /** Secondary labels: 5:1 on white, 4.6:1 on the grouped background. */
-  secondary: '#6C6C70',
-  separator: '#C6C6C8',
+  /** Grouped background (iOS dark systemGroupedBackground). */
+  background: '#000000',
+  /** Cards, cells, inputs (iOS dark secondarySystemGroupedBackground). */
+  surface: '#1C1C1E',
+  text: '#FFFFFF',
+  /** Secondary labels: 7:1 on black, 6:1 on the cards. */
+  secondary: '#A1A1A8',
+  separator: '#38383A',
   /** Pressed cells, tracks, neutral badges. */
-  fill: '#E9E9EE',
-  /** Tint: primary actions, links, the active state. */
+  fill: '#2C2C2E',
+  /** Brand red for filled buttons (white text on it: 5:1). */
   accent: '#DA291C',
-  accentSoft: 'rgba(218, 41, 28, 0.10)',
+  /** Red for text and links on dark backgrounds (5.4:1 on the cards). */
+  accentText: '#FF6259',
+  accentSoft: 'rgba(255, 98, 89, 0.16)',
   onAccent: '#FFFFFF',
-  success: '#1F7A35',
-  successSoft: 'rgba(52, 199, 89, 0.16)',
+  success: '#32D74B',
+  successSoft: 'rgba(50, 215, 75, 0.16)',
+  /** Frosted bottom bar. */
+  bar: 'rgba(22, 22, 24, 0.92)',
   white: '#FFFFFF',
   black: '#000000',
 } as const;
