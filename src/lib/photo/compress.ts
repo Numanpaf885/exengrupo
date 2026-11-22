@@ -2,8 +2,8 @@
  * Android: resize (long edge ≤ 2000 px) and re-encode as JPEG under 3 MB.
  *
  * The size of each try is measured from the encoder's own base64 output, not
- * by reading the file back with fetch(), which is not reliable for local
- * file:// URIs on Android; each try is a fresh save of the same decoded image.
+ * by reading the file back: Expo's fetch (the global fetch on Android) cannot
+ * read local file:// URIs; each try is a fresh save of the same decoded image.
  * The real image size comes from the decoded image (the camera's reported
  * width/height can be missing or sideways).
  */
