@@ -11,6 +11,7 @@ import { Camera, useCameraDevices, useCameraPermission, usePhotoOutput } from 'r
 import { Button } from '@/components/Button';
 import { Text } from '@/components/Text';
 import { pickNativeLens } from '@/lib/lens/nativeLens';
+import { forgetCameraSpace, rememberCameraSpace } from './pendingPhoto';
 import { colors, space } from '@/theme/tokens';
 import { CameraChrome, type CameraChromeHandle } from './CameraChrome';
 
@@ -23,16 +24,20 @@ export interface CapturedPhoto {
 interface Props {
   onPhoto: (p: CapturedPhoto) => void;
   onBack: () => void;
+  /** The space the photo is for (kept while the phone's camera app is open). */
+  spaceId: string;
   busy?: boolean;
+  /** Shown above the shutter, e.g. "Preparando la foto…" or an error. */
+  notice?: string | null;
 }
 
 const fileUri = (path: string) => (path.startsWith('file://') ? path : `file://${path}`);
 
-export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
+export function PhotoCapture({ onPhoto, onBack, spaceId, busy, notice }: Props) {
   const permission = useCameraPermission();
   const devices = useCameraDevices();
   const pick = useMemo(() => pickNativeLens(devices), [devices]);
-  const photoOutput = usePhotoOutput({ qualityPrioritization: 'balanced' });
+  const photoOutput = usePhotoOutput({ qualityPrioritization: 'quality' });
   const chrome = useRef<CameraChromeHandle>(null);
   const [systemOpen, setSystemOpen] = useState(false);
   const [taking, setTaking] = useState(false);
@@ -44,7 +49,11 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
     chrome.current?.flash();
     try {
       const file = await photoOutput.capturePhotoToFile({ flashMode: 'off' }, {});
-      onPhoto({ uri: fileUri(file.filePath), width: file.width, height: file.height });
+      onPhoto({
+        uri: fileUri(file.filePath),
+        width: file.width,
+        height: file.height,
+      });
     } catch {
       setError('No se pudo tomar la foto. Prueba de nuevo.');
     } finally {
@@ -57,7 +66,13 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
     setSystemOpen(true);
     try {
       await new Promise((r) => setTimeout(r, 300)); // let our camera release the lens
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+      // If Android closes the app meanwhile, RecoverPendingPhoto sends the photo on return.
+      await rememberCameraSpace(spaceId);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+      });
+      await forgetCameraSpace();
       if (!result.canceled) {
         const a = result.assets[0];
         onPhoto({ uri: a.uri, width: a.width, height: a.height });
@@ -103,7 +118,7 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
       onBack={onBack}
       lens={lens}
       busy={busy}
-      message={error ?? hint}
+      message={notice ?? error ?? hint}
       onShutter={pick ? () => void take() : null}
       shutterDisabled={taking}
       onSystemCamera={() => void systemCamera()}

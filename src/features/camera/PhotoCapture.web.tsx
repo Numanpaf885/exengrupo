@@ -17,16 +17,22 @@ export interface CapturedPhoto {
   height: number;
 }
 
-type ZoomCaps = MediaTrackCapabilities & { zoom?: { min: number; max: number } };
+type ZoomCaps = MediaTrackCapabilities & {
+  zoom?: { min: number; max: number };
+};
 const stop = (s: MediaStream | null) => s?.getTracks().forEach((t) => t.stop());
 
 interface Props {
   onPhoto: (p: CapturedPhoto) => void;
   onBack: () => void;
+  /** The space the photo is for (kept while the phone's camera app is open). */
+  spaceId: string;
   busy?: boolean;
+  /** Shown above the shutter, e.g. "Preparando la foto…" or an error. */
+  notice?: string | null;
 }
 
-export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
+export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
   const chrome = useRef<CameraChromeHandle>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -42,7 +48,9 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
       return;
     }
     try {
-      const probe = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      const probe = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+      });
       const defaultId = probe.getVideoTracks()[0]?.getSettings().deviceId;
       const cams = (await navigator.mediaDevices.enumerateDevices())
         .filter((d) => d.kind === 'videoinput')
@@ -51,17 +59,28 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
       const chosen = pickWebLens(cams, defaultId);
       if (!chosen) throw new Error('no camera');
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: chosen.device.deviceId }, width: { ideal: 4096 }, height: { ideal: 4096 } },
+        video: {
+          deviceId: { exact: chosen.device.deviceId },
+          width: { ideal: 4096 },
+          height: { ideal: 4096 },
+        },
       });
       const track = stream.getVideoTracks()[0];
       const caps = (track.getCapabilities?.() ?? {}) as ZoomCaps;
       if (caps.width?.max && caps.height?.max) {
         await track
-          .applyConstraints({ width: { ideal: caps.width.max }, height: { ideal: caps.height.max } })
+          .applyConstraints({
+            width: { ideal: caps.width.max },
+            height: { ideal: caps.height.max },
+          })
           .catch(() => undefined);
       }
       if (chosen.kind === 'virtual-wide' && caps.zoom) {
-        await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as MediaTrackConstraintSet] }).catch(() => undefined);
+        await track
+          .applyConstraints({
+            advanced: [{ zoom: caps.zoom.min } as MediaTrackConstraintSet],
+          })
+          .catch(() => undefined);
       }
       streamRef.current = stream;
       setPick(chosen);
@@ -100,7 +119,11 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
     canvas.toBlob(
       (blob) => {
         if (!blob) return setError('No se pudo tomar la foto.');
-        onPhoto({ uri: URL.createObjectURL(blob), width: canvas.width, height: canvas.height });
+        onPhoto({
+          uri: URL.createObjectURL(blob),
+          width: canvas.width,
+          height: canvas.height,
+        });
       },
       'image/jpeg',
       0.92,
@@ -136,7 +159,11 @@ export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
         onBack={onBack}
         lens={pick ? (pick.is05 ? '0.5x' : '0.5x no disponible') : null}
         busy={busy}
-        message={error ?? (pick && !pick.is05 ? 'Si tu teléfono tiene 0.5x, usa la cámara del teléfono y elígelo allí.' : null)}
+        message={
+          notice ??
+          error ??
+          (pick && !pick.is05 ? 'Si tu teléfono tiene 0.5x, usa la cámara del teléfono y elígelo allí.' : null)
+        }
         onShutter={live ? take : null}
         onSystemCamera={systemCamera}
         preview={
