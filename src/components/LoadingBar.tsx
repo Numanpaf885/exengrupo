@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, type LayoutChangeEvent, StyleSheet, View } from 'react-native';
-import { colors, space } from '@/theme/tokens';
+import { colors, radius, space } from '@/theme/tokens';
 import { duration, easeInOut, nativeDriver, reducedMotion } from '@/theme/motion';
 
 /**
- * Indeterminate progress: a black block sweeping along a 4 px track. With
+ * Indeterminate progress: a red capsule sweeping along a rounded 4 px track. With
  * reduced motion it is a still bar. `label` is announced to screen readers.
  */
 export function LoadingBar({ label, inverted }: { label: string; inverted?: boolean }) {
@@ -19,13 +19,13 @@ export function LoadingBar({ label, inverted }: { label: string; inverted?: bool
     return () => loop.stop();
   }, [width, x]);
   const block = Math.max(space(4), width / 3);
-  const fg = inverted ? colors.background : colors.text;
+  const fg = inverted ? colors.white : colors.accentText;
   return (
     <View
       accessibilityRole="progressbar"
       accessibilityLabel={label}
       onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
-      style={styles.track}
+      style={[styles.track, { backgroundColor: inverted ? 'rgba(255,255,255,0.25)' : colors.fill }]}
     >
       <Animated.View
         style={[
@@ -42,6 +42,6 @@ export function LoadingBar({ label, inverted }: { label: string; inverted?: bool
 }
 
 const styles = StyleSheet.create({
-  track: { height: 4, overflow: 'hidden' },
-  block: { height: 4 },
+  track: { height: 4, overflow: 'hidden', borderRadius: radius.pill },
+  block: { height: 4, borderRadius: radius.pill },
 });

@@ -291,7 +291,7 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
 const videoStyle = {
   width: '100%',
   display: 'block',
-  backgroundColor: colors.text,
+  backgroundColor: colors.black,
   objectFit: 'contain',
 } as const;
 
@@ -300,5 +300,5 @@ const imgStyle = { width: '100%', height: 'auto', display: 'block' } as const;
 const styles = StyleSheet.create({
   block: { gap: space(2) },
   deviceRow: { borderTopWidth: rule.width, borderTopColor: rule.color, paddingTop: space(1), paddingBottom: space(2) },
-  shutterBar: { backgroundColor: colors.text, paddingVertical: space(2), alignItems: 'center' },
+  shutterBar: { backgroundColor: colors.black, padding: space(2), alignItems: 'center' },
 });

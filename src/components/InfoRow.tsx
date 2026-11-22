@@ -1,17 +1,14 @@
-import { StyleSheet, View } from 'react-native';
-import { rule, space } from '@/theme/tokens';
+import { ListRow } from './ListRow';
 import { Text } from './Text';
 
-/** A flush-left label / value pair separated by a top rule. */
+/** A label / value pair as a list cell. */
 export function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.row}>
-      <Text variant="label">{label}</Text>
+    <ListRow>
+      <Text variant="caption" tone="secondary">
+        {label}
+      </Text>
       <Text>{value}</Text>
-    </View>
+    </ListRow>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { borderTopWidth: rule.width, borderTopColor: rule.color, paddingTop: space(1), paddingBottom: space(2) },
-});

@@ -1,4 +1,6 @@
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -30,7 +32,7 @@ function RootNavigator() {
         <Stack.Screen name="espacio/[id]/index" />
         <Stack.Screen
           name="espacio/[id]/camara"
-          options={{ animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.text } }}
+          options={{ animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.black } }}
         />
         <Stack.Screen name="espacio/[id]/miembros" />
         <Stack.Screen name="espacio/[id]/archivos" />
@@ -49,11 +51,11 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  const [loaded] = useFonts({ Inter_400Regular, Inter_700Bold });
+  const [loaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
   if (!loaded) return blank;
   return (
     <AuthProvider>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <RootNavigator />
     </AuthProvider>
   );

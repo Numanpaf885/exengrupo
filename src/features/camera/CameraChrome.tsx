@@ -9,9 +9,9 @@ import { forwardRef, type ReactNode, useImperativeHandle, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FadeIn } from '@/components/FadeIn';
-import { Shutter } from '@/components/Shutter';
+import { SHUTTER_HEIGHT, Shutter, shutterTick } from '@/components/Shutter';
 import { Text } from '@/components/Text';
-import { colors, space } from '@/theme/tokens';
+import { colors, radius, space } from '@/theme/tokens';
 import { nativeDriver, reducedMotion } from '@/theme/motion';
 
 export interface CameraChromeHandle {
@@ -32,16 +32,18 @@ interface Props {
   message?: string | null;
 }
 
-function Link({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+/** Translucent capsule button on the black camera chrome (like the iOS camera). */
+function Pill({ label, onPress, disabled, chevron }: { label: string; onPress: () => void; disabled?: boolean; chevron?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={chevron ? 'Atrás' : label}
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
-      style={({ pressed }) => [styles.link, (pressed || disabled) && { opacity: 0.5 }]}
+      style={({ pressed }) => [styles.pill, (pressed || disabled) && { opacity: 0.5 }]}
     >
+      {chevron && <Text style={styles.pillChevron}>‹</Text>}
       <Text variant="label" style={styles.onBlack}>
         {label}
       </Text>
@@ -55,6 +57,11 @@ export const CameraChrome = forwardRef<CameraChromeHandle, Props>(function Camer
 ) {
   const insets = useSafeAreaInsets();
   const flash = useRef(new Animated.Value(0)).current;
+  const shoot = () => {
+    if (!onShutter) return;
+    shutterTick();
+    onShutter();
+  };
   useImperativeHandle(ref, () => ({
     flash() {
       if (reducedMotion()) return;
@@ -67,41 +74,56 @@ export const CameraChrome = forwardRef<CameraChromeHandle, Props>(function Camer
     <View style={styles.root}>
       <StatusBar style="light" />
       <View style={[styles.top, { paddingTop: insets.top + space(1) }]}>
-        <Link label="← Volver" onPress={onBack} />
+        <Pill label="Atrás" chevron onPress={onBack} />
         {lens ? (
-          <Text variant="label" style={styles.onBlack}>
-            {lens}
-          </Text>
+          <View style={[styles.lens, lens === '0.5x' && styles.lensOn]}>
+            <Text variant="label" style={lens === '0.5x' ? styles.lensOnText : styles.onBlack}>
+              {lens}
+            </Text>
+          </View>
         ) : null}
       </View>
 
       <View style={styles.preview}>
         {preview}
+        {/* Tapping anywhere on the picture also takes the photo. */}
+        {onShutter && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tomar foto tocando la imagen"
+            disabled={shutterDisabled || busy}
+            onPress={shoot}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.flash, { opacity: flash }]} />
       </View>
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + space(2) }]}>
         {message ? (
           <FadeIn offset={8}>
-            <Text variant="label" style={styles.onBlack} accessibilityRole="alert">
+            <Text variant="caption" style={styles.message} accessibilityRole="alert">
               {message}
             </Text>
           </FadeIn>
+        ) : onShutter ? (
+          <Text variant="caption" style={styles.message}>
+            Toca la imagen o el botón para tomar la foto.
+          </Text>
         ) : null}
-        <View style={styles.controls}>
-          <View style={styles.side}>
-            {onSystemCamera && <Link label={'Cámara del\nteléfono'} onPress={onSystemCamera} disabled={busy} />}
+        {onSystemCamera && (
+          <View style={styles.center}>
+            <Pill label="Usar cámara del teléfono" onPress={onSystemCamera} disabled={busy} />
           </View>
-          {onShutter ? <Shutter onPress={onShutter} disabled={shutterDisabled || busy} /> : <View style={styles.shutterSpace} />}
-          <View style={styles.side} />
-        </View>
+        )}
+        {onShutter ? <Shutter onPress={onShutter} disabled={shutterDisabled || busy} /> : <View style={styles.shutterSpace} />}
       </View>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.text },
+  root: { flex: 1, backgroundColor: colors.black },
   top: {
     paddingHorizontal: space(2),
     paddingBottom: space(1),
@@ -110,11 +132,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   preview: { flex: 1, overflow: 'hidden', justifyContent: 'center' },
-  flash: { backgroundColor: colors.background },
+  flash: { backgroundColor: colors.white },
   bottom: { paddingHorizontal: space(2), paddingTop: space(2), gap: space(2) },
-  controls: { flexDirection: 'row', alignItems: 'center' },
-  side: { flex: 1 },
-  shutterSpace: { width: space(10), height: space(10) },
-  link: { minHeight: space(6), justifyContent: 'center' },
-  onBlack: { color: colors.background },
+  center: { alignItems: 'center' },
+  shutterSpace: { height: SHUTTER_HEIGHT },
+  pill: {
+    minHeight: 36,
+    paddingHorizontal: space(1.5),
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    flexShrink: 1,
+  },
+  pillChevron: { fontSize: 26, lineHeight: 26, color: colors.white, marginTop: -3 },
+  lens: { paddingHorizontal: space(1.5), paddingVertical: 6, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
+  lensOn: { backgroundColor: 'rgba(255,214,10,0.18)' },
+  lensOnText: { color: '#FFD60A' },
+  message: { color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
+  onBlack: { color: colors.white },
 });

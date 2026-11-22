@@ -168,7 +168,7 @@ const videoStyle = {
   width: '100%',
   height: '100%',
   display: 'block',
-  backgroundColor: colors.text,
+  backgroundColor: colors.black,
   objectFit: 'contain',
 } as const;
 

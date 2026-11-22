@@ -8,7 +8,7 @@ import { TextField } from '@/components/TextField';
 import { usernameError } from '@/lib/auth/validation';
 import { WEB_URL } from '@/lib/config';
 import { confirmAction } from '@/lib/confirm';
-import { colors, rule, space } from '@/theme/tokens';
+import { colors, radius, space } from '@/theme/tokens';
 import { type AdminUser, adminApi, type CodeResult } from './api';
 import { activationLink, formatDateTime, inviteMessage, userStatusText } from './format';
 
@@ -145,7 +145,7 @@ export function UsersPanel({ onSessionEnded }: { onSessionEnded: () => void }) {
 const styles = StyleSheet.create({
   block: { gap: space(2) },
   rowActions: { gap: space(1), marginTop: space(1) },
-  card: { borderWidth: rule.width, borderColor: colors.text, padding: space(2), gap: space(2) },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space(2), gap: space(2) },
   // 14 characters on one line even at 360 px.
   code: { fontSize: 24, lineHeight: 32 },
 });

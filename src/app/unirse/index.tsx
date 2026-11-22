@@ -38,7 +38,7 @@ export default function UnirseConCodigo() {
         returnKeyType="go"
         onSubmitEditing={() => void join()}
       />
-      <Text>Pide el código de 6 letras a quien creó el espacio.</Text>
+      <Text tone="secondary">Pide el código de 6 letras a quien creó el espacio.</Text>
       <Notice text={error} />
       <Button label={busy ? 'Uniéndome…' : 'Unirme'} onPress={() => void join()} disabled={busy} />
     </Screen>

@@ -3,10 +3,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, Share, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { FadeIn } from '@/components/FadeIn';
-import { ListRow } from '@/components/ListRow';
+import { Badge, Chip, initials } from '@/components/Badge';
 import { LoadingBar } from '@/components/LoadingBar';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
+import { Card } from '@/components/Section';
 import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
 import { type SpaceDetail, type SpaceSummary, spacesApi } from '@/features/spaces/api';
@@ -18,24 +19,30 @@ import { realtimeConfigured, WEB_URL } from '@/lib/config';
 import type { PostView } from '@/lib/photo/upload';
 import { subscribeToSpace } from '@/lib/realtime';
 import { formatPostTime } from '@/lib/time';
-import { rule, space as grid } from '@/theme/tokens';
+import { space as grid } from '@/theme/tokens';
 
 function PostItem({ post }: { post: PostView }) {
   return (
-    <ListRow>
-      <Text>
-        {post.username} · {formatPostTime(post.created_at)}
-      </Text>
-      {post.status === 'processing' ? (
-        <View style={styles.pending}>
-          <Text variant="title">Analizando…</Text>
-          <LoadingBar label="Analizando…" />
+    <Card>
+      <View style={styles.meta}>
+        <Badge text={initials(post.username)} round tone="neutral" />
+        <View style={styles.grow}>
+          <Text variant="label">{post.username}</Text>
+          <Text variant="caption" tone="secondary">
+            {formatPostTime(post.created_at)}
+          </Text>
         </View>
+        {post.status === 'processing' && <Chip label="Analizando" tone="neutral" />}
+      </View>
+      {post.status === 'processing' ? (
+        <LoadingBar label="Analizando…" />
       ) : (
         // Keyed by status so the answer fades in when "Analizando…" turns into it.
         <FadeIn key={post.status} offset={8}>
           {post.status === 'error' ? (
-            <Text variant="title">{post.answer || 'No se pudo analizar la foto. Prueba de nuevo.'}</Text>
+            <Text variant="headline" tone="accent">
+              {post.answer || 'No se pudo analizar la foto. Prueba de nuevo.'}
+            </Text>
           ) : (
             <Text variant="answer" selectable style={keepSpaces}>
               {displayAnswer(post.answer)}
@@ -43,7 +50,7 @@ function PostItem({ post }: { post: PostView }) {
           )}
         </FadeIn>
       )}
-    </ListRow>
+    </Card>
   );
 }
 
@@ -154,25 +161,19 @@ export default function Espacio() {
         )
       }
       footer={
-        <Button
-          label="Tomar foto"
-          onPress={() => router.push(`/espacio/${spaceId}/camara`)}
-          disabled={!space}
-          flex
-          trailing="→"
-        />
+        <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} flex large />
       }
     >
-      <View>
+      <View style={styles.titleBlock}>
         <Text variant="display" numberOfLines={3}>
           {space?.name ?? ' '}
         </Text>
         {space && (
           <View style={styles.codeRow}>
-            <Text variant="label" selectable>
+            <Text variant="label" tone="secondary" selectable>
               Código {space.join_code}
             </Text>
-            <Button kind="ghost" label="Invitar" onPress={share} />
+            <Button kind="secondary" small label="Invitar" onPress={share} />
           </View>
         )}
       </View>
@@ -180,23 +181,28 @@ export default function Espacio() {
       <Notice text={error} />
       {error && <Button label="Reintentar" kind="secondary" onPress={() => void load()} />}
 
-      <View style={posts?.length || uploads.list.length ? styles.feed : undefined}>
+      <View style={styles.feed}>
         {uploads.list.map((u) => (
           <FadeIn key={u.id}>
-            <ListRow>
-              <Text>Tu foto</Text>
+            <Card>
+              <View style={styles.meta}>
+                <Badge text="Tú" round />
+                <View style={styles.grow}>
+                  <Text variant="label">Tu foto</Text>
+                  <Text variant="caption" tone="secondary">
+                    {u.state === 'error' ? 'No se envió' : u.state === 'preparing' ? 'Preparando…' : 'Enviando y analizando…'}
+                  </Text>
+                </View>
+              </View>
               {u.state === 'error' ? (
                 <>
                   <Notice text={u.error} />
                   <Button label="Descartar" kind="secondary" onPress={() => dismissUpload(u.id)} />
                 </>
               ) : (
-                <View style={styles.pending}>
-                  <Text variant="title">{u.state === 'preparing' ? 'Preparando…' : 'Enviando y analizando…'}</Text>
-                  <LoadingBar label="Enviando y analizando…" />
-                </View>
+                <LoadingBar label="Enviando y analizando…" />
               )}
-            </ListRow>
+            </Card>
           </FadeIn>
         ))}
         {posts?.map((p, i) => (
@@ -208,17 +214,17 @@ export default function Espacio() {
       {posts === null && !error && <LoadingBar label="Cargando…" />}
       {empty && (
         <FadeIn>
-          <View style={styles.empty}>
-            <Text variant="title">Aún no hay fotos.</Text>
-            <Text>Pulsa «Tomar foto» y encuadra las preguntas: las respuestas aparecen aquí para todo el grupo.</Text>
-          </View>
+          <Card>
+            <Text variant="headline">Aún no hay fotos</Text>
+            <Text tone="secondary">Pulsa «Tomar foto» y encuadra las preguntas: las respuestas aparecen aquí para todo el grupo.</Text>
+          </Card>
         </FadeIn>
       )}
 
       {(Platform.OS === 'web' || !realtimeConfigured) && (
         <View style={styles.more}>
           <Button kind="ghost" label="Actualizar" onPress={() => void refresh()} />
-          {!realtimeConfigured && <Text>Las respuestas nuevas aparecen al pulsar Actualizar.</Text>}
+          {!realtimeConfigured && <Text tone="secondary">Las respuestas nuevas aparecen al pulsar Actualizar.</Text>}
         </View>
       )}
     </Screen>
@@ -229,9 +235,10 @@ export default function Espacio() {
 const keepSpaces = Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap' } as object) : undefined;
 
 const styles = StyleSheet.create({
-  codeRow: { flexDirection: 'row', alignItems: 'center', gap: grid(3) },
-  feed: { borderBottomWidth: rule.width, borderBottomColor: rule.color },
-  pending: { gap: grid(1) },
-  empty: { gap: grid(1), paddingVertical: grid(2) },
-  more: { marginTop: 'auto' },
+  titleBlock: { gap: grid(1) },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: grid(1.5) },
+  feed: { gap: grid(1.5) },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: grid(1.5) },
+  grow: { flex: 1 },
+  more: { marginTop: 'auto', alignItems: 'center' },
 });
