@@ -235,6 +235,8 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   and env vars.
 - Sheets: `server/sheets.ts` signs a service-account JWT with `node:crypto` (no
   Google SDK), maps columns by row-1 header name, writes RAW values, never row 1.
+  Google allows ~60 reads/min: a tab read is shared for 4 s per server instance
+  (writes to that tab clear it) and 429/5xx answers are retried after 0.8/2/4 s.
 - Session token: `v1.<base64url JSON {sub, usr, exp}>.<HMAC-SHA256>`, 30 days,
   `SESSION_SECRET`. Logout = delete the token on the device.
 - Usernames: 3–20 chars `[a-z0-9._-]`, stored lowercase. Passwords: 8+ chars, ≤ 72 bytes.
@@ -341,10 +343,13 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - R2 keys: photos `spaces/{space_id}/{post_id}.jpg` (the 7-day lifecycle rule must
   use prefix `spaces/` only); files `refs/{space_id}/{file_id}.{ext}` and their chunks
   `refs/{space_id}/{file_id}.chunks.json` (kept). Keys in `server/storage.ts`.
-- Upload: `POST /api/spaces/:id/files {name,size}` → row "procesando" + presigned PUT
-  (aws4fetch query signing, 15 min) → the phone PUTs straight to R2 (XHR, progress) →
-  `POST …/files/:fileId/process {step}` until done. R2 needs a CORS rule for
-  https://exengrupo.vercel.app (PUT, header content-type). Images are shrunk on the
+- Upload (changed 2026-11-22: the browser's direct presigned PUT to R2 was
+  rejected): `POST /api/spaces/:id/files {name,size}` → row "procesando" + an upload
+  token (`server/files/uploadToken.ts`, HMAC, 1 h) → the phone sends the bytes
+  through /api in ≤ 4 MB pieces, `PUT …/files/:fileId/chunks/:n` (header
+  `x-upload-token`, no Sheet reads; stored as `refs/…/{file_id}.part{n}`) →
+  `POST …/files/:fileId/process {step, chunks}`; step 0 joins the pieces into the
+  file and deletes them. No R2 CORS rule is needed. Images are shrunk on the
   phone to a ≤ 2000 px JPEG before upload.
 - Processing (`server/files/extract.ts`, one step per call so each fits in 60 s):
   .txt/.md as is; .docx with mammoth; PDF text layer with unpdf; scanned PDF (>50 %

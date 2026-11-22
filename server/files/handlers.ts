@@ -1,7 +1,7 @@
 /**
- * Reference files of a space. The phone uploads straight to R2 with a presigned
- * PUT (files can exceed Vercel's 4.5 MB body limit), then drives processing one
- * step at a time: "procesando" → "listo" or "error". Any member can add; the
+ * Reference files of a space. The phone sends the file through /api in ≤ 4 MB
+ * pieces (Vercel's body limit is 4.5 MB), each stored in R2 and joined by the
+ * first processing step; then it drives processing one step at a time: "procesando" → "listo" or "error". Any member can add; the
  * uploader or the space creator can delete. Files are AI-only: nobody can open
  * or download them through the app.
  */
@@ -9,11 +9,12 @@ import type { Result } from '../auth';
 import { authenticate, type DataDeps, fail, isResult, iso, membership } from '../context';
 import type { VisionClient } from '../ai/providers';
 import { FILE_ERROR, FILE_PROCESSING, FILE_READY, type FileRecord } from '../schema';
-import { type ObjectStorage, refFileKey, refTextKey } from '../storage';
+import { type ObjectStorage, refFileKey, refPartKey, refTextKey } from '../storage';
 import { FALSE, isTrue, type Table, TRUE } from '../table';
 import { chunkPages, type PageText } from './chunk';
 import { extractStep, FileError } from './extract';
 import { FILE_LIMITS, FILE_MSG, fileType } from './types';
+import { signUploadToken, verifyUploadToken } from './uploadToken';
 
 export interface FileDeps extends DataDeps {
   files: Table<FileRecord>;
@@ -95,7 +96,7 @@ export async function listFiles(deps: FileDeps, auth: string | null, spaceId: st
   return { status: 200, body: { files, limits: { max_files: FILE_LIMITS.maxFilesPerSpace, max_bytes: FILE_LIMITS.maxBytes } } };
 }
 
-/** POST { name, size } → a "procesando" row and a presigned PUT URL for the bytes. */
+/** POST { name, size } → a "procesando" row and permission to upload its pieces. */
 export async function createFile(deps: FileDeps, auth: string | null, spaceId: string, body: unknown): Promise<Result> {
   const ctx = await context(deps, auth, spaceId);
   if (isResult(ctx)) return ctx;
@@ -130,15 +131,52 @@ export async function createFile(deps: FileDeps, auth: string | null, spaceId: s
     deleted: FALSE,
   };
   await deps.files.append(record);
-  const url = await deps.storage.presignPut(record.file_key, type.mime, FILE_LIMITS.uploadUrlSeconds);
+  const token = signUploadToken({ fileId, spaceId, userId: ctx.session.sub }, deps.secret, deps.now());
   const who = new Map([[ctx.session.sub, ctx.session.usr]]);
   return {
     status: 201,
     body: {
       file: toView(record, ctx.session.sub, ctx.m.isCreator, who, deps.now()),
-      upload: { url, method: 'PUT', headers: { 'content-type': type.mime } },
+      upload: { token, chunk_bytes: FILE_LIMITS.chunkBytes, chunks: Math.ceil(size / FILE_LIMITS.chunkBytes) },
     },
   };
+}
+
+/**
+ * PUT one piece (raw bytes, header x-upload-token). Checked with the upload
+ * token only, so sending a 50 MB file costs no Sheet reads.
+ */
+export async function uploadChunk(
+  deps: Pick<FileDeps, 'storage' | 'secret' | 'now'>,
+  token: string | null,
+  spaceId: string,
+  fileId: string,
+  index: number,
+  bytes: Uint8Array | null,
+): Promise<Result> {
+  const grant = verifyUploadToken(token ?? '', deps.secret, deps.now());
+  if (!grant || grant.fileId !== fileId || grant.spaceId !== spaceId) return fail(403, FILE_MSG.badUpload);
+  if (!Number.isInteger(index) || index < 0 || index >= FILE_LIMITS.maxChunks) return fail(400, FILE_MSG.badChunk);
+  if (!bytes || bytes.length === 0 || bytes.length > FILE_LIMITS.chunkBytes) return fail(400, FILE_MSG.badChunk);
+  await deps.storage.put(refPartKey(spaceId, fileId, index), bytes, 'application/octet-stream');
+  return { status: 200, body: { ok: true } };
+}
+
+/** Joins pieces 0..count-1 into the file object and removes them. Null when one is missing. */
+async function assemble(deps: FileDeps, f: FileRecord, count: number): Promise<Uint8Array | null> {
+  const keys = Array.from({ length: count }, (_, i) => refPartKey(f.space_id, f.file_id, i));
+  const parts = await Promise.all(keys.map((k) => deps.storage.get(k)));
+  if (parts.some((p) => !p)) return null;
+  const total = parts.reduce((n, p) => n + (p as Uint8Array).length, 0);
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts as Uint8Array[]) {
+    bytes.set(p, at);
+    at += p.length;
+  }
+  if (total <= FILE_LIMITS.maxBytes) await deps.storage.put(f.file_key, bytes, 'application/octet-stream');
+  await Promise.all(keys.map((k) => deps.storage.remove(k).catch(() => undefined)));
+  return bytes;
 }
 
 async function findFile(deps: FileDeps, spaceId: string, fileId: string) {
@@ -168,7 +206,9 @@ export async function processFile(
   const view = (rec: FileRecord) => toView(rec, ctx.session.sub, ctx.m.isCreator, who, deps.now());
   if (f.status !== FILE_PROCESSING || isStale(f, deps.now())) return { status: 200, body: { file: view(f), done: true } };
 
-  const step = Math.max(0, Math.floor(Number((body as { step?: unknown } | null)?.step ?? 0)) || 0);
+  const input = (body ?? {}) as { step?: unknown; chunks?: unknown };
+  const step = Math.max(0, Math.floor(Number(input.step ?? 0)) || 0);
+  const pieces = Math.min(Math.max(0, Math.floor(Number(input.chunks ?? 0)) || 0), FILE_LIMITS.maxChunks);
   const finish = async (patch: Partial<FileRecord>) => {
     await deps.files.update(row.rowNumber, patch);
     return { status: 200, body: { file: view({ ...f, ...patch }), done: true } } satisfies Result;
@@ -179,13 +219,21 @@ export async function processFile(
   };
 
   try {
+    let bytes: Uint8Array | null = null;
     const size = await deps.storage.size(f.file_key);
-    if (size === null) return failWith(FILE_MSG.notUploaded);
-    if (size > FILE_LIMITS.maxBytes) {
-      await deps.storage.remove(f.file_key).catch(() => undefined);
-      return failWith(FILE_MSG.tooBig);
+    if (size === null && step === 0 && pieces > 0) {
+      // First step after the upload: join the pieces into the file.
+      bytes = await assemble(deps, f, pieces);
+      if (!bytes) return failWith(FILE_MSG.notUploaded);
+      if (bytes.length > FILE_LIMITS.maxBytes) return failWith(FILE_MSG.tooBig);
+    } else {
+      if (size === null) return failWith(FILE_MSG.notUploaded);
+      if (size > FILE_LIMITS.maxBytes) {
+        await deps.storage.remove(f.file_key).catch(() => undefined);
+        return failWith(FILE_MSG.tooBig);
+      }
+      bytes = await deps.storage.get(f.file_key);
     }
-    const bytes = await deps.storage.get(f.file_key);
     if (!bytes) return failWith(FILE_MSG.notUploaded);
     const type = fileType(f.name);
     if (!type) return failWith(FILE_MSG.badType);
@@ -234,8 +282,13 @@ export async function deleteFile(deps: FileDeps, auth: string | null, spaceId: s
   if (!row) return fail(404, FILE_MSG.notFound);
   if (!ctx.m.isCreator && row.value.user_id !== ctx.session.sub) return fail(403, FILE_MSG.notAllowed);
   await deps.files.update(row.rowNumber, { deleted: TRUE });
+  // Pieces only remain if the upload never finished processing.
+  const parts =
+    row.value.status === FILE_READY
+      ? []
+      : Array.from({ length: FILE_LIMITS.maxChunks }, (_, i) => refPartKey(spaceId, fileId, i));
   await Promise.all(
-    [row.value.file_key, row.value.text_key].map((k) =>
+    [row.value.file_key, row.value.text_key, ...parts].map((k) =>
       deps.storage.remove(k).catch((e) => deps.log(`r2 delete ${k}: ${e instanceof Error ? e.message : 'error'}`)),
     ),
   );

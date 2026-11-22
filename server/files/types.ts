@@ -9,7 +9,10 @@ export const FILE_LIMITS = {
   ocrPagesPerStep: 3,
   /** A "procesando" file older than this is shown as failed (the phone stopped driving it). */
   staleMs: 15 * 60 * 1000,
-  uploadUrlSeconds: 15 * 60,
+  /** Upload piece size: below Vercel's 4.5 MB request body limit. */
+  chunkBytes: 4_000_000,
+  /** Enough pieces for the largest allowed file. */
+  maxChunks: Math.ceil((50 * 1024 * 1024) / 4_000_000),
 } as const;
 
 export type FileKind = 'pdf' | 'image' | 'text' | 'docx';
@@ -50,4 +53,6 @@ export const FILE_MSG = {
   stale: 'El procesado no terminó. Borra el archivo y súbelo de nuevo.',
   failed: 'No se pudo procesar el archivo. Prueba de nuevo.',
   noTab: 'Falta la pestaña «files» en la hoja de datos.',
+  badUpload: 'La subida no es válida o ha caducado. Vuelve a añadir el archivo.',
+  badChunk: 'Parte del archivo no válida. Vuelve a añadir el archivo.',
 } as const;

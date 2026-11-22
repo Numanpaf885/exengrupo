@@ -7,7 +7,7 @@ import { createSpace, joinSpace, type SpaceSummary } from '../spaces';
 import { memoryStorage } from '../storage';
 import { memoryTable } from '../table';
 import { bearer, TEST_NOW, testDeps } from '../testing';
-import { createFile, deleteFile, type FileDeps, type FileView, listFiles, processFile, type TextFile } from './handlers';
+import { createFile, deleteFile, type FileDeps, type FileView, listFiles, processFile, type TextFile, uploadChunk } from './handlers';
 import { analyzeWithReferences, loadSpaceChunks, TRANSCRIBE_PROMPT } from './refs';
 import { FILE_LIMITS, FILE_MSG } from './types';
 
@@ -43,21 +43,24 @@ async function setup(clients: VisionClient[] = []) {
   return { deps, base, files, storage, space };
 }
 
-type Created = { file: FileView; upload: { url: string; method: string; headers: Record<string, string> } };
+type Created = { file: FileView; upload: { token: string; chunk_bytes: number; chunks: number } };
 type Processed = { file: FileView; done: boolean; next_step?: number; progress?: { done_pages: number; total_pages: number } };
 
-/** create → "PUT" the bytes into storage → run every processing step. */
-async function upload(ctx: Awaited<ReturnType<typeof setup>>, who: string, name: string, bytes: Uint8Array) {
+/** create → send the pieces through /api → run every processing step. */
+async function upload(ctx: Awaited<ReturnType<typeof setup>>, who: string, name: string, bytes: Uint8Array, chunkBytes?: number) {
   const created = await createFile(ctx.deps, bearer(who), ctx.space.space_id, { name, size: bytes.length });
   expect(created.status).toBe(201);
   const { file, upload: up } = created.body as Created;
-  const key = ctx.files.rows.find((r) => r.file_id === file.file_id)!.file_key;
-  expect(up.url).toContain(key);
-  await ctx.storage.put(key, bytes, up.headers['content-type']);
+  const size = chunkBytes ?? up.chunk_bytes;
+  const count = Math.ceil(bytes.length / size);
+  for (let i = 0; i < count; i++) {
+    const res = await uploadChunk(ctx.deps, up.token, ctx.space.space_id, file.file_id, i, bytes.slice(i * size, (i + 1) * size));
+    expect(res.status).toBe(200);
+  }
   let step = 0;
   const steps: Processed[] = [];
   for (;;) {
-    const res = await processFile(ctx.deps, bearer(who), ctx.space.space_id, file.file_id, { step });
+    const res = await processFile(ctx.deps, bearer(who), ctx.space.space_id, file.file_id, { step, chunks: count });
     expect(res.status).toBe(200);
     const body = res.body as Processed;
     steps.push(body);
@@ -89,7 +92,8 @@ describe('createFile', () => {
     expect(row.file_key).toBe(`refs/${ctx.space.space_id}/${file.file_id}.pdf`);
     expect(row.text_key).toBe(`refs/${ctx.space.space_id}/${file.file_id}.chunks.json`);
     expect(row.file_key.startsWith('spaces/')).toBe(false);
-    expect(up).toMatchObject({ method: 'PUT', headers: { 'content-type': 'application/pdf' } });
+    expect(up).toMatchObject({ chunk_bytes: 4_000_000, chunks: 1 });
+    expect(up.token.startsWith('u1.')).toBe(true);
   });
 
   it('rejects other types, empty or too big files, non-members and a 21st file', async () => {
@@ -177,6 +181,43 @@ describe('processFile', () => {
     await ctx.files.append({ ...ctx.files.rows[0], file_id: 'old', status: 'procesando', created_at: new Date(TEST_NOW - FILE_LIMITS.staleMs - 1).toISOString() });
     const list = (await listFiles(ctx.deps, bearer('ana'), ctx.space.space_id)).body as { files: FileView[] };
     expect(list.files.find((f) => f.file_id === 'old')).toMatchObject({ status: 'error', error: FILE_MSG.stale });
+  });
+});
+
+describe('uploads through /api in pieces', () => {
+  it('joins the pieces in order, removes them, and the file is read normally', async () => {
+    const ctx = await setup();
+    const body = 'La presión se mide en pascales. '.repeat(40);
+    const { file } = await upload(ctx, 'luis', 'largo.txt', text(body), 100);
+    expect(file).toMatchObject({ status: FILE_READY });
+    const row = ctx.files.rows[0];
+    expect(new TextDecoder().decode(ctx.storage.objects.get(row.file_key)!)).toBe(body);
+    expect([...ctx.storage.objects.keys()].some((k) => k.includes('.part'))).toBe(false);
+  });
+
+  it('rejects a bad or foreign token, a bad index and an oversized piece, with no Sheet reads', async () => {
+    const ctx = await setup();
+    const created = (await createFile(ctx.deps, bearer('luis'), ctx.space.space_id, { name: 'a.txt', size: 5 })).body as Created;
+    const other = (await createFile(ctx.deps, bearer('luis'), ctx.space.space_id, { name: 'b.txt', size: 5 })).body as Created;
+    const id = ctx.space.space_id;
+    const f = created.file.file_id;
+    const piece = text('hola');
+    expect((await uploadChunk(ctx.deps, 'u1.x.y', id, f, 0, piece)).body).toEqual({ error: FILE_MSG.badUpload });
+    expect((await uploadChunk(ctx.deps, other.upload.token, id, f, 0, piece)).status).toBe(403);
+    expect((await uploadChunk(ctx.deps, created.upload.token, 'otro', f, 0, piece)).status).toBe(403);
+    expect((await uploadChunk(ctx.deps, created.upload.token, id, f, -1, piece)).body).toEqual({ error: FILE_MSG.badChunk });
+    expect((await uploadChunk(ctx.deps, created.upload.token, id, f, FILE_LIMITS.maxChunks, piece)).status).toBe(400);
+    expect((await uploadChunk(ctx.deps, created.upload.token, id, f, 0, new Uint8Array(FILE_LIMITS.chunkBytes + 1))).status).toBe(400);
+    expect((await uploadChunk(ctx.deps, created.upload.token, id, f, 0, new Uint8Array(0))).status).toBe(400);
+    expect((await uploadChunk(ctx.deps, created.upload.token, id, f, 0, piece)).status).toBe(200);
+  });
+
+  it('says the file did not arrive when a piece is missing', async () => {
+    const ctx = await setup();
+    const created = (await createFile(ctx.deps, bearer('luis'), ctx.space.space_id, { name: 'a.txt', size: 8 })).body as Created;
+    await uploadChunk(ctx.deps, created.upload.token, ctx.space.space_id, created.file.file_id, 0, text('hola'));
+    const res = await processFile(ctx.deps, bearer('luis'), ctx.space.space_id, created.file.file_id, { step: 0, chunks: 2 });
+    expect((res.body as Processed).file).toMatchObject({ status: 'error', error: FILE_MSG.notUploaded });
   });
 });
 
