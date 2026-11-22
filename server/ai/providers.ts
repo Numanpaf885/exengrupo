@@ -13,6 +13,31 @@ export type ProviderResult =
 
 export type Provider = (jpegBase64: string) => Promise<ProviderResult>;
 
+/** One vision request: a prompt plus one image or PDF (base64). */
+export interface VisionInput {
+  prompt: string;
+  mime: 'image/jpeg' | 'image/png' | 'application/pdf';
+  data: string;
+  /** Ask for JSON output where the API supports it (Gemini). */
+  json?: boolean;
+  timeoutMs?: number;
+}
+
+/** A configured provider that can run any vision prompt. */
+export interface VisionClient {
+  id: 'claude' | 'gemini' | 'groq' | 'openrouter';
+  model: string;
+  /** Can read PDFs directly (Claude, Gemini). */
+  pdf: boolean;
+  call: (input: VisionInput) => Promise<ProviderResult>;
+}
+
+/** The answering provider: the answer prompt (JSON) + the photo. */
+export const answerProvider =
+  (client: VisionClient, prompt: string = PROMPT): Provider =>
+  (jpegBase64) =>
+    client.call({ prompt, mime: 'image/jpeg', data: jpegBase64, json: true });
+
 /** Defaults, checked against each provider's official SDK / docs repo (Nov 2026). */
 export const DEFAULT_MODELS = {
   claude: 'claude-opus-5-5',
@@ -24,16 +49,16 @@ export const DEFAULT_MODELS = {
 /** Per call; analyzePhoto keeps the whole run inside the 60 s Vercel limit. */
 export const TIMEOUT_MS = 26_000;
 
-async function send(fetchImpl: FetchLike, url: string, init: RequestInit): Promise<Response> {
-  return fetchImpl(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+async function send(fetchImpl: FetchLike, url: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Promise<Response> {
+  return fetchImpl(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
 const failure = (provider: string, model: string, error: string, rateLimited = false, retryAfterSec?: number) =>
   ({ ok: false, provider, model, rateLimited, retryAfterSec, error }) as const;
 
-/** Google Gemini generateContent (REST v1beta) with the image inline and JSON output. */
-export function geminiProvider(key: string, model: string, fetchImpl: FetchLike = fetch): Provider {
-  return async (jpegBase64) => {
+/** Google Gemini generateContent (REST v1beta) with the image or PDF inline. */
+export function geminiClient(key: string, model: string, fetchImpl: FetchLike = fetch): VisionClient {
+  const call = async ({ prompt, mime, data, json, timeoutMs }: VisionInput): Promise<ProviderResult> => {
     try {
       const res = await send(
         fetchImpl,
@@ -42,12 +67,11 @@ export function geminiProvider(key: string, model: string, fetchImpl: FetchLike 
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
           body: JSON.stringify({
-            contents: [
-              { parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: jpegBase64 } }] },
-            ],
-            generationConfig: { response_mime_type: 'application/json', temperature: 0 },
+            contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mime, data } }] }],
+            generationConfig: json ? { response_mime_type: 'application/json', temperature: 0 } : { temperature: 0 },
           }),
         },
+        timeoutMs,
       );
       const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
       if (res.status === 429) return failure('gemini', model, 'rate limited', true, geminiRetrySeconds(body));
@@ -64,18 +88,23 @@ export function geminiProvider(key: string, model: string, fetchImpl: FetchLike 
       return failure('gemini', model, e instanceof Error ? e.name : 'error');
     }
   };
+  return { id: 'gemini', model, pdf: true, call };
 }
+
+export const geminiProvider = (key: string, model: string, fetchImpl: FetchLike = fetch): Provider =>
+  answerProvider(geminiClient(key, model, fetchImpl));
 
 /** OpenAI-compatible chat completions with an image data URL (Groq, OpenRouter). */
 function openAiCompatible(
-  provider: string,
+  provider: 'groq' | 'openrouter',
   url: string,
   key: string,
   model: string,
   fetchImpl: FetchLike,
   extraHeaders: Record<string, string> = {},
-): Provider {
-  return async (jpegBase64) => {
+): VisionClient {
+  const call = async ({ prompt, mime, data, timeoutMs }: VisionInput): Promise<ProviderResult> => {
+    if (mime === 'application/pdf') return failure(provider, model, 'pdf not supported');
     try {
       const res = await send(fetchImpl, url, {
         method: 'POST',
@@ -87,13 +116,13 @@ function openAiCompatible(
             {
               role: 'user',
               content: [
-                { type: 'text', text: PROMPT },
-                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${jpegBase64}` } },
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: `data:${mime};base64,${data}` } },
               ],
             },
           ],
         }),
-      });
+      }, timeoutMs);
       if (res.status === 429) {
         const now = Date.now();
         const retry =
@@ -117,12 +146,19 @@ function openAiCompatible(
       return failure(provider, model, e instanceof Error ? e.name : 'error');
     }
   };
+  return { id: provider, model, pdf: false, call };
 }
 
-export const groqProvider = (key: string, model: string, fetchImpl: FetchLike = fetch): Provider =>
+export const groqClient = (key: string, model: string, fetchImpl: FetchLike = fetch): VisionClient =>
   openAiCompatible('groq', 'https://api.groq.com/openai/v1/chat/completions', key, model, fetchImpl);
 
-export const openRouterProvider = (key: string, model: string, fetchImpl: FetchLike = fetch): Provider =>
+export const openRouterClient = (key: string, model: string, fetchImpl: FetchLike = fetch): VisionClient =>
   openAiCompatible('openrouter', 'https://openrouter.ai/api/v1/chat/completions', key, model, fetchImpl, {
     'x-title': 'exengrupo',
   });
+
+export const groqProvider = (key: string, model: string, fetchImpl: FetchLike = fetch): Provider =>
+  answerProvider(groqClient(key, model, fetchImpl));
+
+export const openRouterProvider = (key: string, model: string, fetchImpl: FetchLike = fetch): Provider =>
+  answerProvider(openRouterClient(key, model, fetchImpl));

@@ -44,3 +44,24 @@ export const ROLE_MEMBER = 'member';
 export const POST_PROCESSING = 'processing';
 export const POST_DONE = 'done';
 export const POST_ERROR = 'error';
+
+/** Reference files of a space (tab "files", created by the user). */
+export type FileRecord = {
+  file_id: string;
+  space_id: string;
+  user_id: string;
+  name: string;
+  type: string;
+  file_key: string;
+  text_key: string;
+  size_bytes: string;
+  pages: string;
+  status: string;
+  error: string;
+  created_at: string;
+  deleted: string;
+};
+
+export const FILE_PROCESSING = 'procesando';
+export const FILE_READY = 'listo';
+export const FILE_ERROR = 'error';

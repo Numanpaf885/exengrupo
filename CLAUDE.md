@@ -33,6 +33,9 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   - `ajustes` (added 2026-11-22 with the user's approval; created by the app on the
     first admin save): clave, valor, actualizado. Admin-entered AI keys (encrypted)
     and model IDs. The four tabs above stay exactly as they are.
+  - `files` (added 2026-11-22, created by the user): file_id, space_id, user_id,
+    name, type, file_key, text_key, size_bytes, pages, status, error, created_at, deleted.
+    Reference files of a space (see "Reference files" below).
 - Login: a username + password page. Hash passwords with bcryptjs on the server
   only. Session = a signed token valid for 30 days, stored with expo-secure-store
   on Android and localStorage on web.
@@ -310,6 +313,34 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   (`startUpload(spaceId, prepare, token)`, rows show "Preparando…" → "Enviando y analizando…").
 - Speed: `src/lib/memo.ts` in-memory stale-while-revalidate cache (cleared on
   logout) + `src/features/spaces/cache.ts`; touching a space row prefetches it.
+
+### Reference files (added 2026-11-22, user request)
+
+- Members add PDF / JPG / PNG / .txt / .md / .docx to a space (screen
+  `espacio/[id]/archivos`). Limits: 50 MB, 500 pages, 20 files per space. Any member
+  adds; uploader or creator deletes (soft delete + R2 objects removed). AI-only: the
+  app never offers to open or download them.
+- R2 keys: photos `spaces/{space_id}/{post_id}.jpg` (the 7-day lifecycle rule must
+  use prefix `spaces/` only); files `refs/{space_id}/{file_id}.{ext}` and their chunks
+  `refs/{space_id}/{file_id}.chunks.json` (kept). Keys in `server/storage.ts`.
+- Upload: `POST /api/spaces/:id/files {name,size}` → row "procesando" + presigned PUT
+  (aws4fetch query signing, 15 min) → the phone PUTs straight to R2 (XHR, progress) →
+  `POST …/files/:fileId/process {step}` until done. R2 needs a CORS rule for
+  https://exengrupo.vercel.app (PUT, header content-type). Images are shrunk on the
+  phone to a ≤ 2000 px JPEG before upload.
+- Processing (`server/files/extract.ts`, one step per call so each fits in 60 s):
+  .txt/.md as is; .docx with mammoth; PDF text layer with unpdf; scanned PDF (>50 %
+  pages without text, ≤ 30 pages) or image → OCR by the vision AI (PDFs only Claude or
+  Gemini, 3 pages per step via pdf-lib). Text → ~1,000-char chunks with page numbers
+  (`chunk.ts`) → JSON at text_key. Every failure ends as "error"; a "procesando" row
+  older than 15 min is shown as an error (`FILE_LIMITS.staleMs`).
+- Answering (`server/files/refs.ts`): if the space has ready files, one call
+  transcribes the questions, MiniSearch (accent-insensitive Spanish, `search.ts`)
+  picks chunks up to 6,000 chars, both answer calls get "Referencia del espacio" +
+  the rule "follow the reference when it answers". `posts.models` gets
+  `… | ref: file p12; notes.docx` (never shown). Without files nothing changes.
+- Providers are `VisionClient`s (`call({prompt, mime, data})`, image or PDF) built by
+  `buildClients()`; `answerProvider()` turns one into the old `Provider`.
 
 ### Admin, invite-only accounts and AI keys (added 2026-11-22)
 

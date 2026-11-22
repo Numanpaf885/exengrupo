@@ -144,7 +144,7 @@ export default function Espacio() {
       headerRight={
         space && (
           <>
-            <Button kind="ghost" label="Invitar" onPress={share} />
+            <Button kind="ghost" label="Archivos" onPress={() => router.push(`/espacio/${spaceId}/archivos`)} />
             <Button
               kind="ghost"
               label={`Miembros (${space.member_count})`}
@@ -168,9 +168,12 @@ export default function Espacio() {
           {space?.name ?? ' '}
         </Text>
         {space && (
-          <Text variant="label" selectable>
-            Código {space.join_code}
-          </Text>
+          <View style={styles.codeRow}>
+            <Text variant="label" selectable>
+              Código {space.join_code}
+            </Text>
+            <Button kind="ghost" label="Invitar" onPress={share} />
+          </View>
         )}
       </View>
 
@@ -226,6 +229,7 @@ export default function Espacio() {
 const keepSpaces = Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap' } as object) : undefined;
 
 const styles = StyleSheet.create({
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: grid(3) },
   feed: { borderBottomWidth: rule.width, borderBottomColor: rule.color },
   pending: { gap: grid(1) },
   empty: { gap: grid(1), paddingVertical: grid(2) },

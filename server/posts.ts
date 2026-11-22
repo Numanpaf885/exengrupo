@@ -23,7 +23,8 @@ export const POST_MSG = {
 
 export interface PostDeps extends DataDeps {
   storage: PhotoStorage;
-  analyze: (jpegBase64: string) => Promise<AiOutcome>;
+  /** Answers the photo; uses the space's reference files when it has any. */
+  analyze: (jpegBase64: string, spaceId: string) => Promise<AiOutcome>;
   broadcast: Broadcaster;
   log: (message: string) => void;
 }
@@ -94,7 +95,7 @@ export async function createPost(
 
   let outcome: AiOutcome;
   try {
-    outcome = await deps.analyze(Buffer.from(photo).toString('base64'));
+    outcome = await deps.analyze(Buffer.from(photo).toString('base64'), spaceId);
   } catch (e) {
     deps.log(`analyze failed: ${e instanceof Error ? e.message : 'unknown'}`);
     outcome = { status: 'error', answer: AI_FAILED, models: '' };
