@@ -324,6 +324,21 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Expo Router: `Stack.Protected` groups need explicit `redirectTo` (signed out →
   `/login`, signed in → `/`), otherwise a signed-out visitor lands on `/admin`.
 
+### Android App Links (links open the app)
+
+- `app.json` → `android.intentFilters` (autoVerify) for
+  `https://exengrupo.vercel.app/unirse/*` and `/activar*`; Expo Router routes the
+  path. `public/.well-known/assetlinks.json` (exported to `dist`, served by
+  Vercel) lists the SHA-256 of every certificate that signs the APK.
+- Today the APK is signed with the shared debug key
+  (FA:C6:17:45:…:03:3B:9C). When the ANDROID_* signing secrets are added, the
+  CI step "Check App Links fingerprint" prints the new SHA-256 and warns until
+  it is added to assetlinks.json (keep the old one too while old installs exist).
+- iPhone: the app is a home-screen web app; iOS never opens those from links
+  (Universal Links need a native iOS app, excluded by the brief).
+- Invite links: `/activar?u=<username>` pre-fills the username; the code is
+  never put in a link.
+
 ### Android signing (GitHub secrets)
 
 The release APK is signed with a keystore from repository secrets:

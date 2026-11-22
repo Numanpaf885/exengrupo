@@ -20,7 +20,29 @@
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "exengrupo.vercel.app",
+              "pathPrefix": "/unirse"
+            },
+            {
+              "scheme": "https",
+              "host": "exengrupo.vercel.app",
+              "pathPrefix": "/activar"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",

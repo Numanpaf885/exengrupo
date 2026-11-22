@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, inviteMessage, userStatusText } from './format';
+import { activationLink, formatDateTime, inviteMessage, userStatusText } from './format';
 
 describe('admin formatting', () => {
   it('formats dates in Spanish', () => {
@@ -20,5 +20,11 @@ describe('admin formatting', () => {
     expect(m).toContain('Usuario: luis');
     expect(m).toContain('ABCD-EFGH-JKMN');
     expect(m).toContain('https://exengrupo.vercel.app/activar');
+  });
+});
+
+describe('activationLink', () => {
+  it('carries the username, never the code', () => {
+    expect(activationLink('https://exengrupo.vercel.app', 'ana.p')).toBe('https://exengrupo.vercel.app/activar?u=ana.p');
   });
 });

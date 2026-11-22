@@ -17,3 +17,7 @@ export function userStatusText(u: { status: string; code_expires_at: string; las
 export function inviteMessage(username: string, code: string, link: string): string {
   return `Tu cuenta de exengrupo:\nUsuario: ${username}\nCódigo de un solo uso: ${code}\nÁbrelo en ${link} y elige tu contraseña. Caduca en 72 horas.`;
 }
+
+/** Link in the invite: opens the app on Android (App Links), the website elsewhere. */
+export const activationLink = (base: string, username: string): string =>
+  `${base}/activar?u=${encodeURIComponent(username)}`;

@@ -13,12 +13,14 @@ interface Props {
   /** Returns a Spanish error message, or null on success. `code` is only sent when activating. */
   onSubmit(username: string, password: string, code: string): Promise<string | null>;
   onSwitch(): void;
+  /** Pre-filled from the invite link (?u=). */
+  initialUsername?: string;
 }
 
 /** Swiss sign-in / account activation (one-time code from the admin). All text in Spanish. */
-export function AuthForm({ mode, onSubmit, onSwitch }: Props) {
+export function AuthForm({ mode, onSubmit, onSwitch, initialUsername = '' }: Props) {
   const activating = mode === 'activate';
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(initialUsername);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
