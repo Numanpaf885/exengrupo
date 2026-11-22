@@ -13,13 +13,14 @@ export function r2Storage(opts: {
   accessKeyId: string;
   secretAccessKey: string;
 }): PhotoStorage {
+  // Trim: a value pasted with a trailing line break would end up inside the Authorization header.
   const client = new AwsClient({
-    accessKeyId: opts.accessKeyId,
-    secretAccessKey: opts.secretAccessKey,
+    accessKeyId: opts.accessKeyId.trim(),
+    secretAccessKey: opts.secretAccessKey.trim(),
     service: 's3',
     region: 'auto',
   });
-  const base = `https://${opts.accountId}.r2.cloudflarestorage.com/${encodeURIComponent(opts.bucket)}`;
+  const base = `https://${opts.accountId.trim()}.r2.cloudflarestorage.com/${encodeURIComponent(opts.bucket.trim())}`;
   return {
     async put(key, bytes, contentType) {
       const path = key.split('/').map(encodeURIComponent).join('/');
