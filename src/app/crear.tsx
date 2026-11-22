@@ -31,7 +31,7 @@ export default function Crear() {
   };
 
   return (
-    <Screen onBack={() => router.back()}>
+    <Screen narrow onBack={() => router.back()}>
       <Text variant="display">Crear espacio</Text>
       <TextField
         label="Nombre del espacio"

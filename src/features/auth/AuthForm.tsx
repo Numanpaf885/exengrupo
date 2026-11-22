@@ -54,7 +54,7 @@ export function AuthForm({ mode, onSubmit, onSwitch, initialUsername = '' }: Pro
   };
 
   return (
-    <Screen>
+    <Screen narrow>
       <HiddenAdminTitle />
       <Text variant="title">{activating ? 'Activar cuenta' : 'Entrar'}</Text>
       {activating && <Text tone="secondary">Escribe tu usuario y el código de un solo uso que te dio el administrador, y elige tu contraseña.</Text>}

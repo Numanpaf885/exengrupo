@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FadeIn } from '@/components/FadeIn';
 import { SHUTTER_HEIGHT, Shutter, shutterTick } from '@/components/Shutter';
 import { Text } from '@/components/Text';
+import { useDesktop } from '@/lib/useDesktop';
 import { colors, radius, space } from '@/theme/tokens';
 import { nativeDriver, reducedMotion } from '@/theme/motion';
 
@@ -56,6 +57,8 @@ export const CameraChrome = forwardRef<CameraChromeHandle, Props>(function Camer
   ref,
 ) {
   const insets = useSafeAreaInsets();
+  // Desktop browsers: keep the controls a comfortable width under the picture.
+  const desktop = useDesktop();
   const flash = useRef(new Animated.Value(0)).current;
   const shoot = () => {
     if (!onShutter) return;
@@ -99,7 +102,7 @@ export const CameraChrome = forwardRef<CameraChromeHandle, Props>(function Camer
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.flash, { opacity: flash }]} />
       </View>
 
-      <View style={[styles.bottom, { paddingBottom: insets.bottom + space(2) }]}>
+      <View style={[styles.bottom, desktop && styles.bottomDesktop, { paddingBottom: insets.bottom + space(2) }]}>
         {message ? (
           <FadeIn offset={8}>
             <Text variant="caption" style={styles.message} accessibilityRole="alert">
@@ -134,6 +137,7 @@ const styles = StyleSheet.create({
   preview: { flex: 1, overflow: 'hidden', justifyContent: 'center' },
   flash: { backgroundColor: colors.white },
   bottom: { paddingHorizontal: space(2), paddingTop: space(2), gap: space(2) },
+  bottomDesktop: { width: '100%', maxWidth: 480, alignSelf: 'center', paddingBottom: space(4) },
   center: { alignItems: 'center' },
   shutterSpace: { height: SHUTTER_HEIGHT },
   pill: {
