@@ -433,7 +433,13 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   `claude-opus-5-5`, effort `medium`, server-side refusal fallbacks
   (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`), maxRetries 0.
 - `analyzePhoto(providers, …)` takes the ordered list; per-call timeout 26 s and
-  no new fallback after ~28 s so a photo stays inside Vercel's 60 s.
+  no new fallback after ~28 s so a photo stays inside Vercel's 60 s. With a Claude
+  key, Claude is always slot 1 and the next best AI slot 2. Each slot falls back on
+  its own, immediately when its AI fails (2026-11-22; before, fallbacks waited for
+  both first answers, so a slow Claude left no time and photos ended Claude-only).
+  Every failed attempt is saved as `… | fail gemini=HTTP 404; groq=rate limited`
+  in posts.models and shown per AI in admin → Uso ("fallos", "último error").
+  Question transcription for reference files uses the faster AIs first, Claude last.
 - Expo Router: `Stack.Protected` groups need explicit `redirectTo` (signed out →
   `/login`, signed in → `/`), otherwise a signed-out visitor lands on `/admin`.
 

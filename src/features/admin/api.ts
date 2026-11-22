@@ -46,7 +46,16 @@ export interface UsageView {
   quota: UsageWindow;
   unreadable: UsageWindow;
   with_references: UsageWindow;
-  providers: Array<UsageWindow & { id: ProviderView['id']; model: string; last_at: string }>;
+  providers: Array<
+    UsageWindow & {
+      id: ProviderView['id'];
+      model: string;
+      last_at: string;
+      failed?: UsageWindow;
+      last_error?: string;
+      last_error_at?: string;
+    }
+  >;
   daily: Array<{ date: string; photos: number }>;
   configured: Record<string, boolean>;
   openrouter_credits: { usage: number; limit: number | null; free_tier: boolean } | null;

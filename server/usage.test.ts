@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PostRecord } from './schema';
-import { openRouterCredits, usageStats } from './usage';
+import { openRouterCredits, parseFailures, usageStats } from './usage';
 
 const NOW = Date.UTC(2026, 10, 22, 12, 0, 0);
 const post = (hoursAgo: number, status: string, answer: string, models: string): PostRecord => ({
@@ -54,5 +54,25 @@ describe('openRouterCredits', () => {
     expect(await openRouterCredits('k', ok as unknown as typeof fetch)).toEqual({ usage: 0.12, limit: null, free_tier: true });
     const bad = vi.fn(async () => new Response('{}', { status: 401 }));
     expect(await openRouterCredits('k', bad as unknown as typeof fetch)).toBeNull();
+  });
+});
+
+describe('AI failures in usage', () => {
+  it('counts failures per AI with the latest reason', () => {
+    const s = usageStats(
+      [
+        post(1, 'done', '1.a', 'claude:opus, groq:qwen | by 1:claude+groq | fail gemini=HTTP 404'),
+        post(30, 'done', '1.a', 'claude:opus | by 1:claude | fail gemini=rate limited; groq=TimeoutError'),
+        post(2, 'error', 'No se pudo analizar la foto. Prueba de nuevo.', 'fail claude=HTTP 529; gemini=HTTP 404'),
+      ],
+      NOW,
+    );
+    const by = Object.fromEntries(s.providers.map((p) => [p.id, p]));
+    expect(by.gemini.failed).toEqual({ day: 2, week: 3, total: 3 });
+    expect(by.gemini.last_error).toBe('HTTP 404');
+    expect(by.groq.failed).toEqual({ day: 0, week: 1, total: 1 });
+    expect(by.claude.failed.total).toBe(1);
+    expect(by.claude.total).toBe(2);
+    expect(parseFailures('claude:x | by 1:claude')).toEqual([]);
   });
 });

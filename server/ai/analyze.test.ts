@@ -73,7 +73,11 @@ describe('analyzePhoto (preference order, 2 at a time)', () => {
 
   it('reports the quota message with the shortest retry time', async () => {
     const out = await analyzePhoto([limited('gemini', 200), limited('groq'), limited('openrouter', 61)], 'b64');
-    expect(out).toEqual({ status: 'error', answer: 'Límite de IA alcanzado, prueba en 2 min', models: '' });
+    expect(out).toEqual({
+      status: 'error',
+      answer: 'Límite de IA alcanzado, prueba en 2 min',
+      models: 'fail gemini=rate limited; groq=rate limited; openrouter=rate limited',
+    });
   });
 
   it('defaults to 5 minutes when no provider says when to retry', async () => {
@@ -89,6 +93,38 @@ describe('analyzePhoto (preference order, 2 at a time)', () => {
   it('gives a generic error when nothing works and it is not a quota problem', async () => {
     const out = await analyzePhoto([broken('gemini'), limited('groq'), broken('openrouter')], 'b64');
     expect(out).toMatchObject({ status: 'error', answer: 'No se pudo analizar la foto. Prueba de nuevo.' });
+  });
+
+  it('always keeps Claude and fills the other slot with the next best AI right away', async () => {
+    // Claude is slow; Gemini fails at once. Groq must start before Claude finishes.
+    const order: string[] = [];
+    let releaseClaude!: () => void;
+    const claude: Provider = () =>
+      new Promise((resolve) => {
+        order.push('claude:start');
+        releaseClaude = () => resolve({ ok: true, provider: 'claude', model: 'claude-m', text: G });
+      });
+    const groq: Provider = async () => {
+      order.push('groq:start');
+      releaseClaude();
+      return { ok: true, provider: 'groq', model: 'groq-m', text: Q };
+    };
+    const out = await analyzePhoto([claude, broken('gemini'), groq, ok('openrouter', O)], 'b64');
+    expect(order).toEqual(['claude:start', 'groq:start']);
+    expect(out).toEqual({
+      status: 'done',
+      answer: '1.a  2.b/c ?',
+      models: 'claude:claude-m, groq:groq-m | by 1:claude+groq 2:claude=b,groq=c | fail gemini=HTTP 500',
+    });
+  });
+
+  it('records why each AI failed, including replies that were not valid JSON', async () => {
+    const out = await analyzePhoto([ok('claude', 'lo siento'), broken('gemini'), ok('groq', G), ok('openrouter', Q)], 'b64');
+    expect(out.status).toBe('done');
+    expect(out.models.split(' | ')[0]).toBe('groq:groq-m, openrouter:openrouter-m');
+    expect(out.models).toContain('fail ');
+    expect(out.models).toContain('claude=respuesta no válida');
+    expect(out.models).toContain('gemini=HTTP 500');
   });
 
   it('errors clearly when no provider has a key', async () => {
