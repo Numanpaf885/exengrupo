@@ -31,8 +31,10 @@ export default function Camara() {
       const ready = await compressPhoto(photo.uri, photo.width, photo.height);
       startUpload(spaceId, async () => ready, token);
       back();
-    } catch {
-      setError('No se pudo preparar la foto. Prueba de nuevo.');
+    } catch (e) {
+      // The detail helps tell what failed on a given phone.
+      const detail = e instanceof Error && e.message ? ` (${e.message.slice(0, 120)})` : '';
+      setError(`No se pudo preparar la foto. Prueba de nuevo.${detail}`);
       working.current = false;
       setBusy(false);
     } finally {
