@@ -229,6 +229,13 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Web pick order: ultra-wide by label (EN/ES, accent-insensitive) → virtual
   dual-wide/triple (at minimum `zoom` if the track supports it) → default back
   camera. Only an ultra-wide label counts as "0.5x: sí" on web.
+- Web camera release (2026-11-22): every stream a screen opens is registered in
+  `CameraStreams` (`src/lib/lens/cameraStreams.ts`) and `useReleaseCamera` stops
+  them all on leaving/covering the screen, page hidden, pagehide and unmount; a
+  stream that arrives after the screen closed is stopped at once; the camera stops
+  as soon as the frame is copied; one start at a time ("Abriendo cámara…" instead of
+  the "Abrir cámara" button during startup). Before, leaving during startup or a
+  second tap left a camera running and the phone's indicator on until the tab closed.
 
 ### Accounts (slice 2)
 

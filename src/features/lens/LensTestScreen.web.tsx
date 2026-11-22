@@ -3,7 +3,7 @@
  * Uses getUserMedia + enumerateDevices; captures a frame from the video
  * stream at full track resolution into a canvas and exports a JPEG.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { InfoRow } from '@/components/InfoRow';
@@ -13,6 +13,8 @@ import { Text } from '@/components/Text';
 import { formatFocal, lensFromExif } from '@/lib/lens/exif';
 import { format05, formatResolution, formatZoom } from '@/lib/lens/format';
 import { readJpegFocalTags } from '@/lib/lens/jpegExif';
+import { CameraStreams } from '@/lib/lens/cameraStreams';
+import { useReleaseCamera } from '@/lib/lens/useReleaseCamera';
 import { pickWebLens, WEB_KIND_LABEL, type WebPick, webBackCameras } from '@/lib/lens/webLens';
 import { colors, rule, space } from '@/theme/tokens';
 
@@ -36,9 +38,6 @@ interface Cam {
 /** Zoom is not in every TS DOM lib yet. */
 type ZoomCaps = MediaTrackCapabilities & { zoom?: { min: number; max: number } };
 
-function stopStream(stream: MediaStream | null) {
-  stream?.getTracks().forEach((t) => t.stop());
-}
 
 export function LensTestScreen({ onBack }: { onBack?: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -50,13 +49,14 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
   const [track, setTrack] = useState<{ width: number; height: number; zoom?: number } | null>(null);
   const [shot, setShot] = useState<Shot | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(
-    () => () => {
-      stopStream(streamRef.current);
-    },
-    [],
-  );
+  // Every stream this screen opens, so all of them can be turned off.
+  const streams = useRef(new CameraStreams<MediaStream>()).current;
+  const released = useCallback(() => {
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setPhase((p) => (p === 'live' || p === 'starting' ? 'idle' : p));
+  }, []);
+  useReleaseCamera(streams, released);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -79,11 +79,12 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
         video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
+      if (!streams.add(probe)) return; // the screen closed meanwhile
       const defaultId = probe.getVideoTracks()[0]?.getSettings().deviceId;
       const all = (await navigator.mediaDevices.enumerateDevices())
         .filter((d) => d.kind === 'videoinput')
         .map((d) => ({ deviceId: d.deviceId, label: d.label }));
-      stopStream(probe);
+      streams.stop(probe);
 
       const chosen = pickWebLens(all, defaultId);
       setCams(webBackCameras(all));
@@ -95,6 +96,8 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
         video: { deviceId: { exact: chosen.device.deviceId }, width: { ideal: 4096 }, height: { ideal: 4096 } },
         audio: false,
       });
+      if (!streams.add(stream)) return;
+      if (streamRef.current) streams.stop(streamRef.current);
       const t = stream.getVideoTracks()[0];
       const caps = (t.getCapabilities?.() ?? {}) as ZoomCaps;
       if (caps.width?.max && caps.height?.max) {
@@ -110,9 +113,11 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
       }
       const s = t.getSettings() as MediaTrackSettings & { zoom?: number };
       setTrack({ width: s.width ?? 0, height: s.height ?? 0, zoom: s.zoom });
+      if (streams.isClosed) return;
       streamRef.current = stream;
       setPhase('live');
     } catch (e) {
+      if (streams.isClosed) return;
       setPhase('idle');
       const name = e instanceof DOMException ? e.name : '';
       setError(
@@ -132,6 +137,9 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // The frame is copied: turn the camera (and its indicator) off right away.
+    streams.stopAll();
+    streamRef.current = null;
     canvas.toBlob(
       (blob) => {
         if (!blob) {
@@ -146,8 +154,6 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
           lens: lensLabel,
           is05: pick?.is05 ?? false,
         });
-        stopStream(streamRef.current);
-        streamRef.current = null;
         setPhase('photo');
       },
       'image/jpeg',
@@ -162,7 +168,7 @@ export function LensTestScreen({ onBack }: { onBack?: () => void }) {
    */
   const openSystemCamera = () => {
     // Release our camera so the phone's camera app can use it.
-    stopStream(streamRef.current);
+    streams.stopAll();
     streamRef.current = null;
     if (phase === 'live') setPhase('idle');
     fileRef.current?.click();

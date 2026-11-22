@@ -7,6 +7,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { Text } from '@/components/Text';
+import { CameraStreams } from '@/lib/lens/cameraStreams';
+import { useReleaseCamera } from '@/lib/lens/useReleaseCamera';
 import { pickWebLens, type WebPick } from '@/lib/lens/webLens';
 import { colors, space } from '@/theme/tokens';
 import { CameraChrome, type CameraChromeHandle } from './CameraChrome';
@@ -20,7 +23,6 @@ export interface CapturedPhoto {
 type ZoomCaps = MediaTrackCapabilities & {
   zoom?: { min: number; max: number };
 };
-const stop = (s: MediaStream | null) => s?.getTracks().forEach((t) => t.stop());
 
 interface Props {
   onPhoto: (p: CapturedPhoto) => void;
@@ -39,11 +41,28 @@ export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [pick, setPick] = useState<WebPick | null>(null);
   const [live, setLive] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  // Every stream this screen opens, so all of them can be turned off.
+  const streams = useRef(new CameraStreams<MediaStream>()).current;
+
+  const released = useCallback(() => {
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setLive(false);
+  }, []);
+  useReleaseCamera(streams, released);
 
   const open = useCallback(async () => {
+    // One start at a time: a second tap during startup used to leave a camera running.
+    if (startingRef.current || streams.isClosed) return;
+    startingRef.current = true;
+    setStarting(true);
     setError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
+      startingRef.current = false;
+      setStarting(false);
       setError('Este navegador no permite usar la cámara. Usa la cámara del teléfono.');
       return;
     }
@@ -51,11 +70,12 @@ export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
       const probe = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
       });
+      if (!streams.add(probe)) return; // the screen closed meanwhile
       const defaultId = probe.getVideoTracks()[0]?.getSettings().deviceId;
       const cams = (await navigator.mediaDevices.enumerateDevices())
         .filter((d) => d.kind === 'videoinput')
         .map((d) => ({ deviceId: d.deviceId, label: d.label }));
-      stop(probe);
+      streams.stop(probe);
       const chosen = pickWebLens(cams, defaultId);
       if (!chosen) throw new Error('no camera');
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -65,6 +85,8 @@ export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
           height: { ideal: 4096 },
         },
       });
+      if (!streams.add(stream)) return;
+      if (streamRef.current) streams.stop(streamRef.current);
       const track = stream.getVideoTracks()[0];
       const caps = (track.getCapabilities?.() ?? {}) as ZoomCaps;
       if (caps.width?.max && caps.height?.max) {
@@ -82,22 +104,26 @@ export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
           })
           .catch(() => undefined);
       }
+      if (streams.isClosed) return;
       streamRef.current = stream;
       setPick(chosen);
       setLive(true);
     } catch (e) {
+      if (streams.isClosed) return;
       const denied = e instanceof DOMException && e.name === 'NotAllowedError';
       setError(
         denied
           ? 'Permiso de cámara denegado. Actívalo en Ajustes > Safari > Cámara, o usa la cámara del teléfono.'
           : 'No se pudo abrir la cámara. Usa la cámara del teléfono.',
       );
+    } finally {
+      startingRef.current = false;
+      if (!streams.isClosed) setStarting(false);
     }
-  }, []);
+  }, [streams]);
 
   useEffect(() => {
     void open();
-    return () => stop(streamRef.current);
   }, [open]);
 
   useEffect(() => {
@@ -116,6 +142,9 @@ export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
     canvas.width = v.videoWidth;
     canvas.height = v.videoHeight;
     canvas.getContext('2d')?.drawImage(v, 0, 0, canvas.width, canvas.height);
+    // The frame is copied: turn the camera (and its indicator) off right away.
+    streams.stopAll();
+    released();
     canvas.toBlob(
       (blob) => {
         if (!blob) return setError('No se pudo tomar la foto.');
@@ -131,9 +160,8 @@ export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
   };
 
   const systemCamera = () => {
-    stop(streamRef.current);
-    streamRef.current = null;
-    setLive(false);
+    streams.stopAll();
+    released();
     fileRef.current?.click();
   };
 
@@ -169,6 +197,10 @@ export function PhotoCapture({ onPhoto, onBack, busy, notice }: Props) {
         preview={
           live ? (
             <video ref={videoRef} playsInline muted autoPlay style={videoStyle} />
+          ) : starting ? (
+            <View style={styles.center}>
+              <Text style={styles.onBlack}>Abriendo cámara…</Text>
+            </View>
           ) : (
             <View style={styles.center}>
               <Button label="Abrir cámara" onPress={() => void open()} disabled={busy} />
@@ -201,4 +233,5 @@ const videoStyle = {
 
 const styles = StyleSheet.create({
   center: { padding: space(2), gap: space(2) },
+  onBlack: { color: colors.white },
 });
