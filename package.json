@@ -1,6 +1,7 @@
 {
   "name": "exengrupo",
   "version": "1.0.0",
+  "license": "MIT",
   "main": "expo-router/entry",
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
