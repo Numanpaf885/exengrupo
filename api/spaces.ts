@@ -10,11 +10,16 @@
  *   GET    /api/spaces/:id/posts               feed, newest first
  *   POST   /api/spaces/:id/posts               multipart "photo" (JPEG ≤ 3 MB) → answer
  *   GET    /api/spaces/:id/posts/:postId       one post (after a broadcast)
+ *   GET    /api/spaces/:id/files               reference files (name, type, pages, status)
+ *   POST   /api/spaces/:id/files               { name, size } → row + presigned R2 PUT URL
+ *   POST   /api/spaces/:id/files/:fileId/process  { step } → one processing step
+ *   DELETE /api/spaces/:id/files/:fileId       soft delete + remove from R2 (uploader/creator)
  */
 import type { Result } from '../server/auth';
 import { createPost, getPost, listPosts } from '../server/posts';
 import { matchSpacesRoute, spacesPath } from '../server/router';
-import { dataDeps, postDeps, readJson, respond } from '../server/http';
+import { createFile, deleteFile, listFiles, processFile } from '../server/files/handlers';
+import { dataDeps, fileDeps, postDeps, readJson, respond } from '../server/http';
 import {
   createSpace,
   deleteSpace,
@@ -61,6 +66,14 @@ async function dispatch(request: Request): Promise<Result> {
       return createPost(postDeps(), auth, route.spaceId, await readPhoto(request));
     case 'getPost':
       return getPost(dataDeps(), auth, route.spaceId, route.postId);
+    case 'listFiles':
+      return listFiles(fileDeps(), auth, route.spaceId);
+    case 'createFile':
+      return createFile(fileDeps(), auth, route.spaceId, await readJson(request));
+    case 'processFile':
+      return processFile(fileDeps(), auth, route.spaceId, route.fileId, await readJson(request));
+    case 'deleteFile':
+      return deleteFile(fileDeps(), auth, route.spaceId, route.fileId);
     case 'methodNotAllowed':
       return { status: 405, body: { error: 'Método no permitido.' } };
     default:

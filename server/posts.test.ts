@@ -33,7 +33,7 @@ describe('createPost', () => {
     expect(post).toMatchObject({ username: 'luis', status: 'done', answer: '1.a  2.V' });
 
     expect(put).toHaveBeenCalledWith(`spaces/${space.space_id}/${post.post_id}.jpg`, JPEG, 'image/jpeg');
-    expect(analyze).toHaveBeenCalledWith(Buffer.from(JPEG).toString('base64'));
+    expect(analyze).toHaveBeenCalledWith(Buffer.from(JPEG).toString('base64'), space.space_id);
     const channel = base.spaces.rows[0].channel_id;
     expect(broadcast.mock.calls).toEqual([
       [channel, post.post_id],

@@ -33,6 +33,7 @@ function RootNavigator() {
           options={{ animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.text } }}
         />
         <Stack.Screen name="espacio/[id]/miembros" />
+        <Stack.Screen name="espacio/[id]/archivos" />
         <Stack.Screen name="lente" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn} redirectTo="/">

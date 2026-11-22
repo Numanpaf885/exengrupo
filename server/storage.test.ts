@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { photoKey, r2Storage } from './storage';
+import { PHOTO_PREFIX, photoKey, r2Storage, refFileKey } from './storage';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -32,5 +32,19 @@ describe('r2Storage', () => {
     const req = fetchMock.mock.calls[0][0];
     expect(req.url).toBe('https://acc.r2.cloudflarestorage.com/exengrupo-fotos/spaces/s1/p1.jpg');
     expect(req.headers.get('authorization')).toMatch(/^AWS4-HMAC-SHA256 Credential=AK\/\d{8}\/auto\/s3\/aws4_request, /);
+  });
+
+  it('presigns a PUT under refs/ that expires and signs only the host', async () => {
+    const storage = r2Storage({ accountId: 'acc', bucket: 'exengrupo-fotos', accessKeyId: 'AK', secretAccessKey: 'SK' });
+    const url = new URL(await storage.presignPut('refs/s1/f1.pdf', 'application/pdf', 900));
+    expect(url.origin + url.pathname).toBe('https://acc.r2.cloudflarestorage.com/exengrupo-fotos/refs/s1/f1.pdf');
+    expect(url.searchParams.get('X-Amz-Expires')).toBe('900');
+    expect(url.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
+    expect(url.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('keeps photos and reference files under different prefixes', () => {
+    expect(photoKey('s1', 'p1')).toBe('spaces/s1/p1.jpg');
+    expect(refFileKey('s1', 'f1', 'pdf').startsWith(PHOTO_PREFIX)).toBe(false);
   });
 });

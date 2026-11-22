@@ -5,15 +5,17 @@
  * DEFAULT_MODELS.
  */
 import { decryptSecret, keyHint } from '../secretbox';
-import { claudeProvider, testClaudeKey } from './claude';
+import { claudeClient, testClaudeKey } from './claude';
 import {
+  answerProvider,
   DEFAULT_MODELS,
   type FetchLike,
-  geminiProvider,
-  groqProvider,
-  openRouterProvider,
+  geminiClient,
+  groqClient,
+  openRouterClient,
   type Provider,
   TIMEOUT_MS,
+  type VisionClient,
 } from './providers';
 
 export const PROVIDER_IDS = ['claude', 'gemini', 'groq', 'openrouter'] as const;
@@ -80,17 +82,22 @@ export function providerViews(resolved: ResolvedProvider[]) {
   }));
 }
 
-/** Configured providers in preference order, ready for analyzePhoto. */
-export function buildProviders(resolved: ResolvedProvider[], fetchImpl?: FetchLike): Provider[] {
-  const out: Provider[] = [];
+/** Configured providers in preference order, able to run any vision prompt. */
+export function buildClients(resolved: ResolvedProvider[], fetchImpl?: FetchLike): VisionClient[] {
+  const out: VisionClient[] = [];
   for (const r of resolved) {
     if (!r.key) continue;
-    if (r.id === 'claude') out.push(claudeProvider(r.key, r.model, TIMEOUT_MS, fetchImpl));
-    if (r.id === 'gemini') out.push(geminiProvider(r.key, r.model, fetchImpl));
-    if (r.id === 'groq') out.push(groqProvider(r.key, r.model, fetchImpl));
-    if (r.id === 'openrouter') out.push(openRouterProvider(r.key, r.model, fetchImpl));
+    if (r.id === 'claude') out.push(claudeClient(r.key, r.model, TIMEOUT_MS, fetchImpl));
+    if (r.id === 'gemini') out.push(geminiClient(r.key, r.model, fetchImpl));
+    if (r.id === 'groq') out.push(groqClient(r.key, r.model, fetchImpl));
+    if (r.id === 'openrouter') out.push(openRouterClient(r.key, r.model, fetchImpl));
   }
   return out;
+}
+
+/** Configured answering providers in preference order, ready for analyzePhoto. */
+export function buildProviders(resolved: ResolvedProvider[], fetchImpl?: FetchLike): Provider[] {
+  return buildClients(resolved, fetchImpl).map((c) => answerProvider(c));
 }
 
 export interface KeyTest {

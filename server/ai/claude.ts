@@ -6,17 +6,17 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { PROMPT } from './answers';
-import type { FetchLike, Provider, ProviderResult } from './providers';
+import { answerProvider, type FetchLike, type Provider, type ProviderResult, type VisionClient, type VisionInput } from './providers';
 import { retryAfterHeaderSeconds } from './retry';
 
-export function claudeProvider(key: string, model: string, timeoutMs: number, fetchImpl?: FetchLike): Provider {
+export function claudeClient(key: string, model: string, timeoutMs: number, fetchImpl?: FetchLike): VisionClient {
   const client = new Anthropic({
     apiKey: key,
     timeout: timeoutMs,
     maxRetries: 0, // our own fallback order takes over instead of retrying
     ...(fetchImpl ? { fetch: fetchImpl as unknown as typeof fetch } : {}),
   });
-  return async (jpegBase64): Promise<ProviderResult> => {
+  const call = async ({ prompt, mime, data, timeoutMs: perCall }: VisionInput): Promise<ProviderResult> => {
     const fail = (error: string, rateLimited = false, retryAfterSec?: number): ProviderResult => ({
       ok: false,
       provider: 'claude',
@@ -26,6 +26,10 @@ export function claudeProvider(key: string, model: string, timeoutMs: number, fe
       error,
     });
     try {
+      const media =
+        mime === 'application/pdf'
+          ? ({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } } as const)
+          : ({ type: 'image', source: { type: 'base64', media_type: mime, data } } as const);
       const response = await client.beta.messages.create({
         model,
         max_tokens: 16000,
@@ -35,13 +39,10 @@ export function claudeProvider(key: string, model: string, timeoutMs: number, fe
         messages: [
           {
             role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: jpegBase64 } },
-              { type: 'text', text: PROMPT },
-            ],
+            content: [media, { type: 'text', text: prompt }],
           },
         ],
-      });
+      }, perCall ? { timeout: perCall } : undefined);
       if (response.stop_reason === 'refusal') return fail('refused');
       const text = response.content
         .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
@@ -56,7 +57,11 @@ export function claudeProvider(key: string, model: string, timeoutMs: number, fe
       return fail(e instanceof Error ? e.name : 'error');
     }
   };
+  return { id: 'claude', model, pdf: true, call };
 }
+
+export const claudeProvider = (key: string, model: string, timeoutMs: number, fetchImpl?: FetchLike): Provider =>
+  answerProvider(claudeClient(key, model, timeoutMs, fetchImpl), PROMPT);
 
 /** Free key check: looks up the model (no tokens are used). */
 export async function testClaudeKey(key: string, model: string, fetchImpl?: FetchLike): Promise<{ ok: boolean; message: string }> {

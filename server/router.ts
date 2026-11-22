@@ -13,7 +13,11 @@ export type SpacesRoute =
   | { name: 'removeMember'; spaceId: string; userId: string }
   | { name: 'listPosts'; spaceId: string }
   | { name: 'createPost'; spaceId: string }
-  | { name: 'getPost'; spaceId: string; postId: string };
+  | { name: 'getPost'; spaceId: string; postId: string }
+  | { name: 'listFiles'; spaceId: string }
+  | { name: 'createFile'; spaceId: string }
+  | { name: 'processFile'; spaceId: string; fileId: string }
+  | { name: 'deleteFile'; spaceId: string; fileId: string };
 
 export type RouteMatch = SpacesRoute | { name: 'notFound' } | { name: 'methodNotAllowed' };
 
@@ -44,7 +48,13 @@ export function matchSpacesRoute(method: string, seg: string[]): RouteMatch {
     return pick({ GET: { name: 'listPosts', spaceId: a }, POST: { name: 'createPost', spaceId: a } });
   }
   if (seg.length === 3 && b === 'posts') return pick({ GET: { name: 'getPost', spaceId: a, postId: c } });
-  void d;
+  if (seg.length === 2 && b === 'files') {
+    return pick({ GET: { name: 'listFiles', spaceId: a }, POST: { name: 'createFile', spaceId: a } });
+  }
+  if (seg.length === 3 && b === 'files') return pick({ DELETE: { name: 'deleteFile', spaceId: a, fileId: c } });
+  if (seg.length === 4 && b === 'files' && d === 'process') {
+    return pick({ POST: { name: 'processFile', spaceId: a, fileId: c } });
+  }
   return { name: 'notFound' };
 }
 

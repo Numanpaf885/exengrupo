@@ -2,14 +2,15 @@
 import bcrypt from 'bcryptjs';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import type { AdminDeps } from './admin';
-import { analyzePhoto } from './ai/analyze';
-import { buildProviders, resolveProviders, testProviderKey } from './ai/config';
+import { buildClients, resolveProviders, testProviderKey } from './ai/config';
 import { TIMEOUT_MS } from './ai/providers';
 import type { AuthDeps, Result } from './auth';
 import type { DataDeps } from './context';
+import type { FileDeps } from './files/handlers';
+import { analyzeWithReferences, loadSpaceChunks } from './files/refs';
 import type { PostDeps } from './posts';
 import { supabaseBroadcaster } from './realtime';
-import type { MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
+import type { FileRecord, MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
 import { type SettingsStore, sheetsSettings } from './settings';
 import { normalizePrivateKey, serviceAccountTokenSource, SheetsClient } from './sheets';
 import { r2Storage } from './storage';
@@ -78,22 +79,47 @@ export function dataDeps(): DataDeps {
   };
 }
 
-export function postDeps(): PostDeps {
+function storage() {
+  return r2Storage({
+    accountId: env('R2_ACCOUNT_ID'),
+    bucket: env('R2_BUCKET'),
+    accessKeyId: env('R2_ACCESS_KEY_ID'),
+    secretAccessKey: env('R2_SECRET_ACCESS_KEY'),
+  });
+}
+
+/** Keys/models from the admin panel win over Vercel's; order Claude, Gemini, Groq, OpenRouter. */
+async function visionClients(secret: string) {
+  return buildClients(resolveProviders(await settings().getAll(), cleanEnv(), secret));
+}
+
+export function fileDeps(): FileDeps {
   const data = dataDeps();
   return {
     ...data,
-    storage: r2Storage({
-      accountId: env('R2_ACCOUNT_ID'),
-      bucket: env('R2_BUCKET'),
-      accessKeyId: env('R2_ACCESS_KEY_ID'),
-      secretAccessKey: env('R2_SECRET_ACCESS_KEY'),
-    }),
-    // Keys/models from the admin panel win over Vercel's; order Claude, Gemini, Groq, OpenRouter.
-    analyze: async (jpegBase64) => {
-      const resolved = resolveProviders(await settings().getAll(), cleanEnv(), data.secret);
+    files: sheetsTable<FileRecord>(sheetsClient(), 'files'),
+    storage: storage(),
+    clients: () => visionClients(data.secret),
+    log: (message) => console.error(message),
+  };
+}
+
+export function postDeps(): PostDeps {
+  const data = dataDeps();
+  const r2 = storage();
+  const files = sheetsTable<FileRecord>(sheetsClient(), 'files');
+  return {
+    ...data,
+    storage: r2,
+    analyze: async (jpegBase64, spaceId) => {
       // Keep the whole run inside Vercel's 60 s: no new fallback after this point.
       const fallbackDeadline = Date.now() + 60_000 - TIMEOUT_MS - 6_000;
-      return analyzePhoto(buildProviders(resolved), jpegBase64, { fallbackDeadline });
+      return analyzeWithReferences(jpegBase64, {
+        clients: await visionClients(data.secret),
+        chunks: () => loadSpaceChunks(files, r2, spaceId),
+        fallbackDeadline,
+        log: (message) => console.error(message),
+      });
     },
     broadcast: supabaseBroadcaster(env('SUPABASE_URL'), env('SUPABASE_SECRET_KEY')),
     log: (message) => console.error(message),
