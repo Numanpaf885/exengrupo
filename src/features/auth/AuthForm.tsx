@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { StyleSheet, type TextInputInstance, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { FadeIn } from '@/components/FadeIn';
 import { HiddenAdminTitle } from '@/components/HiddenAdminTitle';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
@@ -109,9 +110,11 @@ export function AuthForm({ mode, onSubmit, onSwitch, initialUsername = '' }: Pro
       </View>
       {activating && <Text>La contraseña necesita al menos 8 caracteres. El código caduca a las 72 horas.</Text>}
       {error && (
-        <Text variant="label" accessibilityRole="alert">
-          {error}
-        </Text>
+        <FadeIn key={error} offset={8}>
+          <Text variant="label" accessibilityRole="alert">
+            {error}
+          </Text>
+        </FadeIn>
       )}
       <View style={styles.actions}>
         <Button

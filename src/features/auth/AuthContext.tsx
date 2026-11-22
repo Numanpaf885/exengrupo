@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { api } from '@/lib/api';
 import { parseStoredSession, serializeSession, type SessionUser, type StoredSession } from '@/lib/session/session';
 import { clearSession, loadSession, saveSession } from '@/lib/session/tokenStore';
+import { memo } from '@/lib/memo';
 
 type Status = 'loading' | 'signedOut' | 'signedIn';
 
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await clearSession();
+    memo.clear();
     setSession(null);
     setStatus('signedOut');
   }, []);

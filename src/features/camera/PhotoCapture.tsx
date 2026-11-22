@@ -1,17 +1,18 @@
 /**
- * Android camera for a space: opens the ultra-wide (0.5x) when the phone exposes
- * it, otherwise the widest lens with "0.5x no disponible". The phone's own camera
- * app is offered too, for phones (e.g. Xiaomi) that hide the ultra-wide.
+ * Android camera for a space, full screen: opens the ultra-wide (0.5x) when the
+ * phone exposes it, otherwise the widest lens with "0.5x no disponible". The
+ * phone's own camera app is offered too, for phones (e.g. Xiaomi) that hide the
+ * ultra-wide.
  */
 import * as ImagePicker from 'expo-image-picker';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { Camera, useCameraDevices, useCameraPermission, usePhotoOutput } from 'react-native-vision-camera';
 import { Button } from '@/components/Button';
-import { Shutter } from '@/components/Shutter';
 import { Text } from '@/components/Text';
 import { pickNativeLens } from '@/lib/lens/nativeLens';
 import { colors, space } from '@/theme/tokens';
+import { CameraChrome, type CameraChromeHandle } from './CameraChrome';
 
 export interface CapturedPhoto {
   uri: string;
@@ -19,13 +20,20 @@ export interface CapturedPhoto {
   height: number;
 }
 
+interface Props {
+  onPhoto: (p: CapturedPhoto) => void;
+  onBack: () => void;
+  busy?: boolean;
+}
+
 const fileUri = (path: string) => (path.startsWith('file://') ? path : `file://${path}`);
 
-export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) => void; busy?: boolean }) {
+export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
   const permission = useCameraPermission();
   const devices = useCameraDevices();
   const pick = useMemo(() => pickNativeLens(devices), [devices]);
-  const photoOutput = usePhotoOutput({ qualityPrioritization: 'quality' });
+  const photoOutput = usePhotoOutput({ qualityPrioritization: 'balanced' });
+  const chrome = useRef<CameraChromeHandle>(null);
   const [systemOpen, setSystemOpen] = useState(false);
   const [taking, setTaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +41,7 @@ export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) =>
   const take = async () => {
     setTaking(true);
     setError(null);
+    chrome.current?.flash();
     try {
       const file = await photoOutput.capturePhotoToFile({ flashMode: 'off' }, {});
       onPhoto({ uri: fileUri(file.filePath), width: file.width, height: file.height });
@@ -60,27 +69,46 @@ export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) =>
     }
   };
 
+  const lens = pick ? (pick.is05 ? '0.5x' : '0.5x no disponible') : null;
+  const hint =
+    pick && !pick.is05 ? 'Si tu teléfono tiene 0.5x o 0.6x, usa la cámara del teléfono y elígelo allí.' : null;
+
   if (!permission.hasPermission) {
     return (
-      <View style={styles.block}>
-        <Text>Para tomar fotos, la app necesita la cámara.</Text>
-        {permission.canRequestPermission ? (
-          <Button label="Permitir cámara" onPress={() => void permission.requestPermission()} />
-        ) : (
-          <>
-            <Text>Activa el permiso de cámara en Ajustes.</Text>
-            <Button label="Abrir Ajustes" onPress={() => void Linking.openSettings()} />
-          </>
-        )}
-      </View>
+      <CameraChrome
+        onBack={onBack}
+        onShutter={null}
+        onSystemCamera={() => void systemCamera()}
+        message={error}
+        preview={
+          <View style={styles.center}>
+            <Text style={styles.onBlack}>Para tomar fotos, la app necesita la cámara.</Text>
+            {permission.canRequestPermission ? (
+              <Button label="Permitir cámara" onPress={() => void permission.requestPermission()} />
+            ) : (
+              <>
+                <Text style={styles.onBlack}>Activa el permiso de cámara en Ajustes.</Text>
+                <Button label="Abrir Ajustes" onPress={() => void Linking.openSettings()} />
+              </>
+            )}
+          </View>
+        }
+      />
     );
   }
 
   return (
-    <View style={styles.block}>
-      {pick && !pick.is05 && <Text variant="label">0.5x no disponible</Text>}
-      <View style={styles.cameraBox}>
-        {pick ? (
+    <CameraChrome
+      ref={chrome}
+      onBack={onBack}
+      lens={lens}
+      busy={busy}
+      message={error ?? hint}
+      onShutter={pick ? () => void take() : null}
+      shutterDisabled={taking}
+      onSystemCamera={() => void systemCamera()}
+      preview={
+        pick ? (
           <Camera
             style={StyleSheet.absoluteFill}
             device={pick.device}
@@ -91,24 +119,15 @@ export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) =>
             onError={() => setError('La cámara dio un error. Usa la cámara del teléfono.')}
           />
         ) : (
-          <Text style={styles.onBlack}>Buscando cámara…</Text>
-        )}
-      </View>
-      <View style={styles.shutterBar}>
-        <Shutter onPress={() => void take()} disabled={!pick || taking || busy} />
-      </View>
-      {pick && !pick.is05 && (
-        <Text>Si tu teléfono tiene 0.5x o 0.6x, usa la cámara del teléfono y elígelo allí.</Text>
-      )}
-      <Button label="Usar cámara del teléfono" kind="secondary" onPress={() => void systemCamera()} disabled={busy} />
-      {error && <Text variant="label">{error}</Text>}
-    </View>
+          <Text style={[styles.onBlack, styles.pad]}>Buscando cámara…</Text>
+        )
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  block: { gap: space(2) },
-  cameraBox: { width: '100%', aspectRatio: 3 / 4, backgroundColor: colors.text, justifyContent: 'center' },
-  onBlack: { color: colors.background, padding: space(2) },
-  shutterBar: { backgroundColor: colors.text, paddingVertical: space(2), alignItems: 'center' },
+  center: { padding: space(2), gap: space(2) },
+  onBlack: { color: colors.background },
+  pad: { padding: space(2) },
 });

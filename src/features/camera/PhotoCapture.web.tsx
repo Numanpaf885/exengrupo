@@ -7,10 +7,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
-import { Shutter } from '@/components/Shutter';
-import { Text } from '@/components/Text';
 import { pickWebLens, type WebPick } from '@/lib/lens/webLens';
 import { colors, space } from '@/theme/tokens';
+import { CameraChrome, type CameraChromeHandle } from './CameraChrome';
 
 export interface CapturedPhoto {
   uri: string;
@@ -21,7 +20,14 @@ export interface CapturedPhoto {
 type ZoomCaps = MediaTrackCapabilities & { zoom?: { min: number; max: number } };
 const stop = (s: MediaStream | null) => s?.getTracks().forEach((t) => t.stop());
 
-export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) => void; busy?: boolean }) {
+interface Props {
+  onPhoto: (p: CapturedPhoto) => void;
+  onBack: () => void;
+  busy?: boolean;
+}
+
+export function PhotoCapture({ onPhoto, onBack, busy }: Props) {
+  const chrome = useRef<CameraChromeHandle>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -86,6 +92,7 @@ export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) =>
   const take = () => {
     const v = videoRef.current;
     if (!v || !v.videoWidth) return;
+    chrome.current?.flash();
     const canvas = document.createElement('canvas');
     canvas.width = v.videoWidth;
     canvas.height = v.videoHeight;
@@ -123,20 +130,25 @@ export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) =>
   };
 
   return (
-    <View style={styles.block}>
-      {pick && !pick.is05 && <Text variant="label">0.5x no disponible</Text>}
-      {live ? (
-        <>
-          <video ref={videoRef} playsInline muted autoPlay style={videoStyle} />
-          <View style={styles.shutterBar}>
-            <Shutter onPress={take} disabled={busy} />
-          </View>
-        </>
-      ) : (
-        <Button label="Abrir cámara" onPress={() => void open()} disabled={busy} />
-      )}
-      <Button label="Usar cámara del teléfono" kind="secondary" onPress={systemCamera} disabled={busy} />
-      {error && <Text variant="label">{error}</Text>}
+    <>
+      <CameraChrome
+        ref={chrome}
+        onBack={onBack}
+        lens={pick ? (pick.is05 ? '0.5x' : '0.5x no disponible') : null}
+        busy={busy}
+        message={error ?? (pick && !pick.is05 ? 'Si tu teléfono tiene 0.5x, usa la cámara del teléfono y elígelo allí.' : null)}
+        onShutter={live ? take : null}
+        onSystemCamera={systemCamera}
+        preview={
+          live ? (
+            <video ref={videoRef} playsInline muted autoPlay style={videoStyle} />
+          ) : (
+            <View style={styles.center}>
+              <Button label="Abrir cámara" onPress={() => void open()} disabled={busy} />
+            </View>
+          )
+        }
+      />
       <input
         ref={fileRef}
         type="file"
@@ -145,13 +157,21 @@ export function PhotoCapture({ onPhoto, busy }: { onPhoto: (p: CapturedPhoto) =>
         style={{ display: 'none' }}
         onChange={(e) => void onFile(e.target.files?.[0])}
       />
-    </View>
+    </>
   );
 }
 
-const videoStyle = { width: '100%', display: 'block', backgroundColor: colors.text, objectFit: 'contain' } as const;
+// Fills the preview area; "contain" shows exactly the frame that will be captured.
+const videoStyle = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  display: 'block',
+  backgroundColor: colors.text,
+  objectFit: 'contain',
+} as const;
 
 const styles = StyleSheet.create({
-  block: { gap: space(2) },
-  shutterBar: { backgroundColor: colors.text, paddingVertical: space(2), alignItems: 'center' },
+  center: { padding: space(2), gap: space(2) },
 });

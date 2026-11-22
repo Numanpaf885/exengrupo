@@ -295,6 +295,22 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   glued to its answer with a non-breaking space and web keeps the double spaces.
 - Checked at 360 px and 430 px with no horizontal overflow (Playwright, mocked /api).
 
+### UI/UX pass (added 2026-11-22, user request)
+
+- Motion: `src/theme/motion.ts` (durations, ease-out curve, reduced-motion check).
+  RN `Animated` only (no Reanimated dependency), opacity/transform only, skipped when
+  the phone asks for reduced motion. `FadeIn` (enter + list stagger), `usePressScale`
+  (buttons, rows, shutter), `LoadingBar` (indeterminate black bar), stack slide transitions.
+- `Screen` has `headerRight` (ghost text links), a pinned `footer` (main action in
+  the thumb zone: "Tomar foto", "Crear espacio"/"Unirme") and pull-to-refresh.
+- Camera: full screen, never scrolls (`src/features/camera/CameraChrome.tsx`):
+  top bar (Volver + lens status), preview fills the middle, shutter + "Cámara del
+  teléfono" at the bottom, white flash + haptic tick on capture (expo-haptics).
+  Taking a photo closes the camera at once; compression runs in the background
+  (`startUpload(spaceId, prepare, token)`, rows show "Preparando…" → "Enviando y analizando…").
+- Speed: `src/lib/memo.ts` in-memory stale-while-revalidate cache (cleared on
+  logout) + `src/features/spaces/cache.ts`; touching a space row prefetches it.
+
 ### Admin, invite-only accounts and AI keys (added 2026-11-22)
 
 - Account state lives in the fixed `users.password_hash` cell
