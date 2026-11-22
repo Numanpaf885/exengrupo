@@ -473,7 +473,12 @@ GitHub run number, so each build installs over the previous one.
   `releases/latest` from the GitHub API; if its `build-N` is newer than this APK's
   `EXPO_PUBLIC_BUILD_NUMBER` (set by CI = run number = versionCode), home and the
   sign-in screen show "Nueva versión disponible" (`src/features/update/`). "Actualizar"
-  opens the APK download; Android then installs it over the app (data kept, same key).
+  downloads the APK inside the app (expo-file-system/legacy, progress) and opens the
+  system installer (expo-intent-launcher, content URI; permission
+  REQUEST_INSTALL_PACKAGES): the user then taps Android's "Actualizar" (mandatory;
+  the first time Android also asks once to allow installs from exengrupo). On any
+  failure it falls back to the browser download. "Más tarde" hides the card only
+  until the app goes to the background and is opened again.
   Pure logic in `src/lib/update/version.ts`. Web: no-op (the site is always current).
 
 ### APK downloads (GitHub Releases)
