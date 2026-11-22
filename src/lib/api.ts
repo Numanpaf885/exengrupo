@@ -4,6 +4,9 @@ import { setOffline } from './connectivity';
 
 const BASE = apiBase(Platform.OS, process.env.EXPO_PUBLIC_API_URL);
 
+/** Full URL of an /api path (for requests that can't use api(), e.g. uploads with progress). */
+export const apiUrl = (path: string): string => `${BASE}${path}`;
+
 export const OFFLINE_MESSAGE = 'Sin conexión. Revisa tu internet y prueba de nuevo.';
 const SERVER_MESSAGE = 'Error del servidor. Prueba de nuevo.';
 

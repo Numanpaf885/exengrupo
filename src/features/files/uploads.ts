@@ -1,10 +1,10 @@
 /**
- * Reference files being added: create the row → PUT the bytes straight to R2
- * (presigned URL, with progress) → run the processing steps until "listo" or
- * "error". Runs in the background, so leaving the screen doesn't stop it.
+ * Reference files being added: create the row → send the file through /api in
+ * ≤ 4 MB pieces (with progress, each retried) → run the processing steps until
+ * "listo" or "error". Runs in the background, so leaving the screen doesn't stop it.
  */
 import { useSyncExternalStore } from 'react';
-import { OFFLINE_MESSAGE } from '@/lib/api';
+import { apiUrl, OFFLINE_MESSAGE } from '@/lib/api';
 import { filesApi, type UploadTarget } from './api';
 import type { PickedFile } from './picked';
 
@@ -31,16 +31,56 @@ const patch = (id: string, p: Partial<FileJob>) => {
   emit();
 };
 
-function put(target: UploadTarget, blob: Blob, onProgress: (pct: number) => void): Promise<boolean> {
+type PieceResult = { ok: true } | { ok: false; error: string };
+
+/** PUT one piece with upload progress. */
+function putPiece(url: string, token: string, piece: Blob, onProgress: (sent: number) => void): Promise<PieceResult> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', target.url);
-    Object.entries(target.headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
-    xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
-    xhr.onerror = () => resolve(false);
-    xhr.send(blob);
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('content-type', 'application/octet-stream');
+    xhr.setRequestHeader('x-upload-token', token);
+    xhr.upload.onprogress = (e) => onProgress(e.loaded);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve({ ok: true });
+      let error = 'No se pudo subir el archivo. Prueba de nuevo.';
+      try {
+        const body = JSON.parse(xhr.responseText) as { error?: string };
+        if (body.error) error = body.error;
+      } catch {
+        // keep the generic message
+      }
+      resolve({ ok: false, error });
+    };
+    xhr.onerror = () => resolve({ ok: false, error: OFFLINE_MESSAGE });
+    xhr.send(piece);
   });
+}
+
+/** Sends every piece in order; each piece is retried twice on a network error. */
+async function sendPieces(
+  spaceId: string,
+  fileId: string,
+  target: UploadTarget,
+  blob: Blob,
+  onProgress: (pct: number) => void,
+): Promise<PieceResult> {
+  const total = blob.size || 1;
+  for (let i = 0; i < target.chunks; i++) {
+    const start = i * target.chunk_bytes;
+    const piece = blob.slice(start, Math.min(start + target.chunk_bytes, blob.size));
+    let result: PieceResult = { ok: false, error: OFFLINE_MESSAGE };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      result = await putPiece(apiUrl(filesApi.chunkPath(spaceId, fileId, i)), target.token, piece, (sent) =>
+        onProgress(Math.min(99, Math.round(((start + sent) / total) * 100))),
+      );
+      if (result.ok || result.error !== OFFLINE_MESSAGE) break;
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    }
+    if (!result.ok) return result;
+  }
+  onProgress(100);
+  return { ok: true };
 }
 
 let nextId = 0;
@@ -53,16 +93,18 @@ export function startFileUpload(spaceId: string, file: PickedFile, token: string
   void (async () => {
     const created = await filesApi.create(token, spaceId, file.name, file.size);
     if (!created.ok) return failWith(created.error);
-    const sent = await put(created.data.upload, file.blob, (pct) => patch(id, { progress: `${pct} %` }));
-    if (!sent) {
+    const fileId = created.data.file.file_id;
+    const target = created.data.upload;
+    const sent = await sendPieces(spaceId, fileId, target, file.blob, (pct) => patch(id, { progress: `${pct} %` }));
+    if (!sent.ok) {
       // Tell the server to close the row ("No llegó el archivo") so it doesn't stay "procesando".
-      await filesApi.process(token, spaceId, created.data.file.file_id, 0);
-      return failWith(OFFLINE_MESSAGE);
+      await filesApi.process(token, spaceId, fileId, 0);
+      return failWith(sent.error);
     }
     patch(id, { state: 'procesando', progress: '' });
     let step = 0;
     for (let guard = 0; guard < 40; guard++) {
-      const res = await filesApi.process(token, spaceId, created.data.file.file_id, step);
+      const res = await filesApi.process(token, spaceId, fileId, step, step === 0 ? target.chunks : undefined);
       if (!res.ok) return failWith(res.error);
       if (res.data.done) {
         if (res.data.file.status === 'error') return failWith(res.data.file.error);

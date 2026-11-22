@@ -11,14 +11,15 @@
  *   POST   /api/spaces/:id/posts               multipart "photo" (JPEG ≤ 3 MB) → answer
  *   GET    /api/spaces/:id/posts/:postId       one post (after a broadcast)
  *   GET    /api/spaces/:id/files               reference files (name, type, pages, status)
- *   POST   /api/spaces/:id/files               { name, size } → row + presigned R2 PUT URL
- *   POST   /api/spaces/:id/files/:fileId/process  { step } → one processing step
+ *   POST   /api/spaces/:id/files               { name, size } → row + upload token
+ *   PUT    /api/spaces/:id/files/:fileId/chunks/:n  raw bytes ≤ 4 MB (header x-upload-token)
+ *   POST   /api/spaces/:id/files/:fileId/process  { step, chunks } → one processing step
  *   DELETE /api/spaces/:id/files/:fileId       soft delete + remove from R2 (uploader/creator)
  */
 import type { Result } from '../server/auth';
 import { createPost, getPost, listPosts } from '../server/posts';
 import { matchSpacesRoute, spacesPath } from '../server/router';
-import { createFile, deleteFile, listFiles, processFile } from '../server/files/handlers';
+import { createFile, deleteFile, listFiles, processFile, uploadChunk } from '../server/files/handlers';
 import { dataDeps, fileDeps, postDeps, readJson, respond } from '../server/http';
 import {
   createSpace,
@@ -74,6 +75,15 @@ async function dispatch(request: Request): Promise<Result> {
       return processFile(fileDeps(), auth, route.spaceId, route.fileId, await readJson(request));
     case 'deleteFile':
       return deleteFile(fileDeps(), auth, route.spaceId, route.fileId);
+    case 'uploadChunk': {
+      let bytes: Uint8Array | null = null;
+      try {
+        bytes = new Uint8Array(await request.arrayBuffer());
+      } catch {
+        bytes = null;
+      }
+      return uploadChunk(fileDeps(), request.headers.get('x-upload-token'), route.spaceId, route.fileId, route.index, bytes);
+    }
     case 'methodNotAllowed':
       return { status: 405, body: { error: 'Método no permitido.' } };
     default:
@@ -87,3 +97,4 @@ export const GET = handler;
 export const POST = handler;
 export const PATCH = handler;
 export const DELETE = handler;
+export const PUT = handler;

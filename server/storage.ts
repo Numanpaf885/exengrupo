@@ -12,8 +12,6 @@ export interface ObjectStorage extends PhotoStorage {
   /** The object's size in bytes, or null when it doesn't exist. */
   size(key: string): Promise<number | null>;
   remove(key: string): Promise<void>;
-  /** A URL the phone can PUT the file to directly (bypasses Vercel's body limit). */
-  presignPut(key: string, contentType: string, expiresSec: number): Promise<string>;
 }
 
 /** Photos live under spaces/ — the ONLY prefix the 7-day lifecycle rule may delete. */
@@ -24,6 +22,8 @@ export const photoKey = (spaceId: string, postId: string): string => `${PHOTO_PR
 export const REF_PREFIX = 'refs/';
 export const refFileKey = (spaceId: string, fileId: string, ext: string) => `${REF_PREFIX}${spaceId}/${fileId}.${ext}`;
 export const refTextKey = (spaceId: string, fileId: string) => `${REF_PREFIX}${spaceId}/${fileId}.chunks.json`;
+/** Upload pieces (≤ 4 MB each, sent through /api), joined into the file by the first processing step. */
+export const refPartKey = (spaceId: string, fileId: string, index: number) => `${REF_PREFIX}${spaceId}/${fileId}.part${index}`;
 
 export function r2Storage(opts: {
   accountId: string;
@@ -66,13 +66,6 @@ export function r2Storage(opts: {
       const res = await client.fetch(url(key), { method: 'DELETE' });
       if (!res.ok && res.status !== 404) throw new Error(`R2 delete failed (${res.status})`);
     },
-    async presignPut(key, _contentType, expiresSec) {
-      const target = new URL(url(key));
-      target.searchParams.set('X-Amz-Expires', String(expiresSec));
-      // Query signing: only the host header is signed, so the phone may send any content-type.
-      const signed = await client.sign(target.toString(), { method: 'PUT', aws: { signQuery: true } });
-      return signed.url;
-    },
   };
 }
 
@@ -92,9 +85,6 @@ export function memoryStorage(): ObjectStorage & { objects: Map<string, Uint8Arr
     },
     async remove(key) {
       objects.delete(key);
-    },
-    async presignPut(key) {
-      return `https://r2.test/${key}?X-Amz-Signature=test`;
     },
   };
 }

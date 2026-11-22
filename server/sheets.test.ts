@@ -137,3 +137,49 @@ describe('SheetsClient tabs', () => {
     expect(JSON.parse(String(hdrInit?.body))).toEqual({ values: [['clave', 'valor', 'actualizado']] });
   });
 });
+
+describe('SheetsClient quota protection', () => {
+  const table = { values: [['user_id'], ['u1']] };
+  const status = (code: number) => new Response(JSON.stringify({ error: {} }), { status: code });
+
+  it('shares reads of the same tab for a few seconds and re-reads after a write', async () => {
+    let now = 0;
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(table));
+    const client = new SheetsClient('s', async () => 't', fetchMock, { now: () => now, cacheMs: 4000 });
+    await Promise.all([client.readTable('users'), client.readTable('users'), client.readTable('spaces')]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    now = 3000;
+    await client.readTable('users');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await client.appendRecord('users', ['user_id'], { user_id: 'u2' });
+    await client.readTable('users');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    now = 9000;
+    await client.readTable('spaces');
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('retries a 429 (Google per-minute quota) and then succeeds', async () => {
+    const replies = [status(429), status(429), jsonResponse(table)];
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => replies.shift()!);
+    const sleeps: number[] = [];
+    const client = new SheetsClient('s', async () => 't', fetchMock, { sleep: async (ms) => void sleeps.push(ms) });
+    expect((await client.readTable('users')).records).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sleeps).toHaveLength(2);
+  });
+
+  it('gives up after the last retry and never retries a 4xx other than 429', async () => {
+    const always429 = vi.fn(async (_url: string, _init?: RequestInit) => status(429));
+    const a = new SheetsClient('s', async () => 't', always429, { sleep: async () => undefined, retryDelaysMs: [1, 1] });
+    await expect(a.readTable('users')).rejects.toThrow('Sheets request failed (429)');
+    expect(always429).toHaveBeenCalledTimes(3);
+    const forbidden = vi.fn(async (_url: string, _init?: RequestInit) => status(403));
+    const b = new SheetsClient('s', async () => 't', forbidden, { sleep: async () => undefined });
+    await expect(b.readTable('users')).rejects.toThrow('(403)');
+    expect(forbidden).toHaveBeenCalledTimes(1);
+    // A failed read is not cached.
+    await expect(b.readTable('users')).rejects.toThrow('(403)');
+    expect(forbidden).toHaveBeenCalledTimes(2);
+  });
+});
