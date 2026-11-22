@@ -21,6 +21,24 @@ export interface ProviderUsage extends Window {
   /** Most recent model ID this provider answered with. */
   model: string;
   last_at: string;
+  /** Photos where this AI was tried and failed (error, rate limit, bad reply). */
+  failed: Window;
+  /** Why it failed the last time, e.g. "HTTP 404" or "rate limited". */
+  last_error: string;
+  last_error_at: string;
+}
+
+/** "fail gemini=HTTP 404; groq=rate limited" segment of posts.models → [provider, reason]. */
+export function parseFailures(models: string): Array<[string, string]> {
+  const segment = models.split(' | ').find((s) => s.startsWith('fail '));
+  if (!segment) return [];
+  return segment
+    .slice(5)
+    .split('; ')
+    .map((item) => {
+      const i = item.indexOf('=');
+      return (i > 0 ? [item.slice(0, i), item.slice(i + 1)] : [item, '']) as [string, string];
+    });
 }
 
 export interface UsageStats {
@@ -49,7 +67,7 @@ export function usageStats(posts: PostRecord[], now: number): UsageStats {
     quota: empty(),
     unreadable: empty(),
     with_references: empty(),
-    providers: PROVIDER_IDS.map((id) => ({ id, ...empty(), model: '', last_at: '' })),
+    providers: PROVIDER_IDS.map((id) => ({ id, ...empty(), model: '', last_at: '', failed: empty(), last_error: '', last_error_at: '' })),
     daily: Array.from({ length: 7 }, (_, i) => ({
       date: new Date(now - (6 - i) * DAY).toISOString().slice(0, 10),
       photos: 0,
@@ -68,7 +86,17 @@ export function usageStats(posts: PostRecord[], now: number): UsageStats {
       if (p.answer.startsWith('No se lee bien')) add(stats.unreadable, age);
     }
     if (p.models.includes(' | ref: ')) add(stats.with_references, age);
+    for (const [id, reason] of parseFailures(p.models)) {
+      const prov = stats.providers.find((x) => x.id === id);
+      if (!prov) continue;
+      add(prov.failed, age);
+      if (!prov.last_error_at || p.created_at > prov.last_error_at) {
+        prov.last_error = reason;
+        prov.last_error_at = p.created_at;
+      }
+    }
     const first = p.models.split(' | ')[0] ?? '';
+    if (first.startsWith('fail ')) continue;
     for (const id of modelProviders(p.models)) {
       const prov = stats.providers.find((x) => x.id === id);
       if (!prov) continue;

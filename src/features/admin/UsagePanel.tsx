@@ -112,7 +112,7 @@ export function UsagePanel({ onSessionEnded }: { onSessionEnded: () => void }) {
 
       <Section
         title="Respuestas por IA"
-        footer="Cuenta las fotos en las que cada IA dio respuestas. Los límites exactos de Gemini, Groq y Claude solo se ven en la consola de cada proveedor."
+        footer="Cuenta las fotos en las que cada IA dio respuestas, y cuántas veces falló y por qué. Claude responde siempre que tenga clave; la otra respuesta es de la siguiente IA disponible. Los límites exactos de Gemini, Groq y Claude solo se ven en la consola de cada proveedor."
       >
         {usage.providers.map((p) => (
           <Row
@@ -122,9 +122,13 @@ export function UsagePanel({ onSessionEnded }: { onSessionEnded: () => void }) {
             hint={
               !usage.configured[p.id]
                 ? 'Sin clave'
-                : p.last_at
-                  ? `${p.model} · última ${formatPostTime(p.last_at)}`
-                  : 'Aún no ha respondido'
+                : [
+                    p.last_at ? `${p.model} · última ${formatPostTime(p.last_at)}` : 'Aún no ha respondido',
+                    p.failed?.week ? `${p.failed.week} fallos en 7 días` : '',
+                    p.last_error ? `último error: ${p.last_error}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
             }
           />
         ))}

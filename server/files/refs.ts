@@ -52,7 +52,9 @@ export async function loadSpaceChunks(files: Table<FileRecord>, storage: ObjectS
 }
 
 async function transcribe(clients: VisionClient[], jpegBase64: string, timeoutMs: number): Promise<string> {
-  for (const client of clients) {
+  // Only reading the questions: the faster AIs first, Claude last.
+  const order = [...clients.filter((c) => c.id !== 'claude'), ...clients.filter((c) => c.id === 'claude')];
+  for (const client of order) {
     const r = await client.call({ prompt: TRANSCRIBE_PROMPT, mime: 'image/jpeg', data: jpegBase64, timeoutMs });
     if (r.ok && r.text.trim()) return r.text;
   }
