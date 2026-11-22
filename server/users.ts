@@ -15,6 +15,7 @@ export interface UserStore {
   findById(userId: string): Promise<UserRow | null>;
   create(user: UserRow): Promise<void>;
   touchLogin(userId: string, at: string): Promise<void>;
+  setPasswordHash(userId: string, value: string): Promise<void>;
 }
 
 const TAB = 'users';
@@ -42,6 +43,11 @@ export function sheetsUserStore(client: SheetsClient): UserStore {
       const { headers, users } = await load();
       const found = users.find((u) => u.user.user_id === userId);
       if (found) await client.updateCells(TAB, headers, found.rowNumber, { last_login: at });
+    },
+    async setPasswordHash(userId, value) {
+      const { headers, users } = await load();
+      const found = users.find((u) => u.user.user_id === userId);
+      if (found) await client.updateCells(TAB, headers, found.rowNumber, { password_hash: value });
     },
   };
 }

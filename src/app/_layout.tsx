@@ -15,7 +15,7 @@ function RootNavigator() {
   const signedIn = status === 'signedIn';
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-      <Stack.Protected guard={signedIn}>
+      <Stack.Protected guard={signedIn} redirectTo="/login">
         <Stack.Screen name="index" />
         <Stack.Screen name="crear" />
         <Stack.Screen name="unirse/index" />
@@ -24,12 +24,14 @@ function RootNavigator() {
         <Stack.Screen name="espacio/[id]/miembros" />
         <Stack.Screen name="lente" />
       </Stack.Protected>
-      <Stack.Protected guard={!signedIn}>
+      <Stack.Protected guard={!signedIn} redirectTo="/">
         <Stack.Screen name="login" />
-        <Stack.Screen name="register" />
+        <Stack.Screen name="activar" />
       </Stack.Protected>
       {/* Join links work signed in or out (signed out: log in first, then join). */}
       <Stack.Screen name="unirse/[code]" />
+      {/* Hidden admin panel: tap the "exengrupo" title 7 times. Has its own password. */}
+      <Stack.Screen name="admin" />
     </Stack>
   );
 }

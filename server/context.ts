@@ -1,5 +1,5 @@
 /** Shared dependencies and helpers for the space and post handlers. */
-import { bearerToken, MSG, type Result } from './auth';
+import { bearerToken, MSG, type Result, sessionUserValid } from './auth';
 import type { MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
 import { type SessionPayload, verifySession } from './session';
 import { isTrue, type Table } from './table';
@@ -28,10 +28,16 @@ export const SPACE_MSG = {
   memberNotFound: 'Esa persona no es miembro del espacio.',
 } as const;
 
-/** Verifies the Bearer token; returns the session or a 401 Result. */
-export function authenticate(deps: DataDeps, authorization: string | null): SessionPayload | Result {
+/**
+ * Verifies the Bearer token AND that its account is still active and unchanged
+ * (a reset or deleted account signs out every device). Returns the session or a 401.
+ */
+export async function authenticate(deps: DataDeps, authorization: string | null): Promise<SessionPayload | Result> {
   const payload = verifySession(bearerToken(authorization) ?? '', deps.secret, deps.now());
-  return payload ?? fail(401, MSG.noSession);
+  if (!payload) return fail(401, MSG.noSession);
+  const users = await deps.users.list();
+  const user = users.find((u) => u.value.user_id === payload.sub)?.value ?? null;
+  return sessionUserValid(user, payload.pv) ? payload : fail(401, MSG.noSession);
 }
 
 export const isResult = (x: unknown): x is Result =>

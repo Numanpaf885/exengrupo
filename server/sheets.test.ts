@@ -118,3 +118,22 @@ describe('SheetsClient (mocked fetch)', () => {
     await expect(client.readTable('users')).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe('SheetsClient tabs', () => {
+  it('lists tab titles and creates a new tab with headers', async () => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      url.includes('fields=sheets.properties.title')
+        ? jsonResponse({ sheets: [{ properties: { title: 'users' } }, { properties: { title: 'posts' } }] })
+        : jsonResponse({}),
+    );
+    const client = new SheetsClient('s1', async () => 't', fetchMock);
+    expect(await client.listTabs()).toEqual(['users', 'posts']);
+    await client.createTab('ajustes', ['clave', 'valor', 'actualizado']);
+    const [addUrl, addInit] = fetchMock.mock.calls[1];
+    expect(addUrl).toBe('https://sheets.googleapis.com/v4/spreadsheets/s1:batchUpdate');
+    expect(JSON.parse(String(addInit?.body))).toEqual({ requests: [{ addSheet: { properties: { title: 'ajustes' } } }] });
+    const [hdrUrl, hdrInit] = fetchMock.mock.calls[2];
+    expect(hdrUrl).toContain(`/values/${encodeURIComponent('ajustes!A1')}?valueInputOption=RAW`);
+    expect(JSON.parse(String(hdrInit?.body))).toEqual({ values: [['clave', 'valor', 'actualizado']] });
+  });
+});

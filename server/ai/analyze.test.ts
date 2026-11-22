@@ -23,51 +23,70 @@ const G = '[{"n":1,"type":"mc","answer":"a"},{"n":2,"type":"mc","answer":"b"}]';
 const Q = '[{"n":1,"type":"mc","answer":"a"},{"n":2,"type":"mc","answer":"c"}]';
 const O = '[{"n":1,"type":"mc","answer":"d"}]';
 
-describe('analyzePhoto', () => {
-  it('merges the two main models', async () => {
-    const out = await analyzePhoto({ first: ok('gemini', G), second: ok('groq', Q), fallback: ok('openrouter', O) }, 'b64');
-    expect(out).toEqual({ status: 'done', answer: '1.a  2.b/c ?', models: 'gemini:gemini-m, groq:groq-m' });
+describe('analyzePhoto (preference order, 2 at a time)', () => {
+  it('merges the two most preferred providers', async () => {
+    const third = vi.fn(ok('groq', O));
+    const out = await analyzePhoto([ok('claude', G), ok('gemini', Q), third], 'b64');
+    expect(out).toEqual({ status: 'done', answer: '1.a  2.b/c ?', models: 'claude:claude-m, gemini:gemini-m' });
+    expect(third).not.toHaveBeenCalled();
   });
 
-  it('replaces a failed model with the OpenRouter fallback', async () => {
-    const fb = vi.fn(ok('openrouter', O));
-    const out = await analyzePhoto({ first: ok('gemini', G), second: limited('groq', 30), fallback: fb }, 'b64');
+  it('replaces a failed provider with the next one in the order', async () => {
+    const fb = vi.fn(ok('groq', O));
+    const out = await analyzePhoto([ok('claude', G), limited('gemini', 30), fb], 'b64');
     expect(out.answer).toBe('1.a/d ?  2.b');
-    expect(out.models).toBe('gemini:gemini-m, openrouter:openrouter-m');
+    expect(out.models).toBe('claude:claude-m, groq:groq-m');
     expect(fb).toHaveBeenCalledTimes(1);
   });
 
-  it('uses the fallback alone when both main models fail', async () => {
-    const out = await analyzePhoto({ first: broken('gemini'), second: limited('groq'), fallback: ok('openrouter', O) }, 'b64');
-    expect(out).toEqual({ status: 'done', answer: '1.d', models: 'openrouter:openrouter-m' });
+  it('fills both slots from the queue when both favourites fail', async () => {
+    const out = await analyzePhoto([broken('claude'), limited('gemini'), ok('groq', G), ok('openrouter', O)], 'b64');
+    expect(out).toEqual({ status: 'done', answer: '1.a/d ?  2.b', models: 'groq:groq-m, openrouter:openrouter-m' });
+  });
+
+  it('keeps going down the list until one works', async () => {
+    const out = await analyzePhoto([ok('gemini', G), broken('groq'), broken('openrouter'), ok('claude', O)], 'b64');
+    expect(out.models).toBe('gemini:gemini-m, claude:claude-m');
+  });
+
+  it('treats a reply that is not JSON as a failure and falls back', async () => {
+    const out = await analyzePhoto([ok('gemini', 'Lo siento'), ok('groq', Q), ok('openrouter', O)], 'b64');
+    expect(out).toEqual({ status: 'done', answer: '1.d/a ?  2.c', models: 'openrouter:openrouter-m, groq:groq-m' });
+  });
+
+  it('works with a single configured provider', async () => {
+    expect(await analyzePhoto([ok('groq', Q)], 'b64')).toEqual({ status: 'done', answer: '1.a  2.c', models: 'groq:groq-m' });
+  });
+
+  it('starts no new fallback after the deadline', async () => {
+    const fb = vi.fn(ok('openrouter', O));
+    const out = await analyzePhoto([broken('gemini'), broken('groq'), fb], 'b64', { fallbackDeadline: 100, now: () => 200 });
+    expect(fb).not.toHaveBeenCalled();
+    expect(out.status).toBe('error');
   });
 
   it('reports the quota message with the shortest retry time', async () => {
-    const out = await analyzePhoto(
-      { first: limited('gemini', 200), second: limited('groq'), fallback: limited('openrouter', 61) },
-      'b64',
-    );
+    const out = await analyzePhoto([limited('gemini', 200), limited('groq'), limited('openrouter', 61)], 'b64');
     expect(out).toEqual({ status: 'error', answer: 'Límite de IA alcanzado, prueba en 2 min', models: '' });
   });
 
   it('defaults to 5 minutes when no provider says when to retry', async () => {
-    const out = await analyzePhoto({ first: limited('gemini'), second: limited('groq'), fallback: null }, 'b64');
+    const out = await analyzePhoto([limited('gemini'), limited('groq')], 'b64');
     expect(out.answer).toBe('Límite de IA alcanzado, prueba en 5 min');
   });
 
   it('says the photo is unreadable when models answer []', async () => {
-    const out = await analyzePhoto({ first: ok('gemini', '[]'), second: ok('groq', '[]'), fallback: null }, 'b64');
+    const out = await analyzePhoto([ok('gemini', '[]'), ok('groq', '[]')], 'b64');
     expect(out).toMatchObject({ status: 'error', answer: 'No se lee bien, repite la foto' });
   });
 
   it('gives a generic error when nothing works and it is not a quota problem', async () => {
-    const out = await analyzePhoto({ first: broken('gemini'), second: limited('groq'), fallback: broken('openrouter') }, 'b64');
+    const out = await analyzePhoto([broken('gemini'), limited('groq'), broken('openrouter')], 'b64');
     expect(out).toMatchObject({ status: 'error', answer: 'No se pudo analizar la foto. Prueba de nuevo.' });
   });
 
-  it('ignores a reply that is not JSON', async () => {
-    const out = await analyzePhoto({ first: ok('gemini', 'Lo siento'), second: ok('groq', Q), fallback: null }, 'b64');
-    expect(out).toEqual({ status: 'done', answer: '1.a  2.c', models: 'groq:groq-m' });
+  it('errors clearly when no provider has a key', async () => {
+    expect(await analyzePhoto([], 'b64')).toMatchObject({ status: 'error' });
   });
 });
 

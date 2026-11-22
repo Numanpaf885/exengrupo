@@ -30,9 +30,22 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   - `spaces`: space_id, name, join_code, channel_id, creator_id, created_at, deleted
   - `members`: space_id, user_id, role, joined_at, removed
   - `posts`: post_id, space_id, user_id, photo_key, status, answer, models, created_at, photo_expires_at
+  - `ajustes` (added 2026-11-22 with the user's approval; created by the app on the
+    first admin save): clave, valor, actualizado. Admin-entered AI keys (encrypted)
+    and model IDs. The four tabs above stay exactly as they are.
 - Login: a username + password page. Hash passwords with bcryptjs on the server
   only. Session = a signed token valid for 30 days, stored with expo-secure-store
   on Android and localStorage on web.
+- Accounts are INVITE-ONLY (user decision 2026-11-22, like the Libros project):
+  there is no public sign-up. The admin creates a user and gets a one-time code
+  (XXXX-XXXX-XXXX, 72 h, 5 tries, stored only as a keyed hash); the person opens
+  "Tengo un código" (/activar), types username + code + a new password.
+- Admin panel (/admin): opened by tapping the big "exengrupo" title 7 times
+  within 4 s (home and sign-in screens); its own password ADMIN_PASSWORD (Vercel).
+  Users: create (shows the code once), new code (also signs the person out on
+  every device), delete (can't sign in, leaves every space). Claves IA: add,
+  change, remove and test (free endpoints, no tokens) the AI keys and model IDs,
+  including a Claude (Anthropic) slot.
 - Spaces: after login, a user creates a space (which gets a 6-letter join code +
   link) or joins one with a code or link. Any member can send photos. Only the
   creator can rename the space, remove members or delete it (soft delete: set
@@ -51,11 +64,15 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   bucket `exengrupo-fotos` as `spaces/{space_id}/{post_id}.jpg` via the S3 API.
   R2 already deletes them after 7 days (lifecycle rule). Set
   `photo_expires_at = created_at + 7 days`.
-- AI: send each photo to TWO free vision providers in parallel: Gemini and Groq
-  first, with an OpenRouter free vision model as the fallback when either fails
-  or hits a rate limit. Check each provider's CURRENT official docs for its free
-  vision model IDs and request format. NEVER hardcode model names from memory;
-  make each model ID an env var with a documented default.
+- AI: send each photo to TWO vision providers in parallel. Preference order
+  (user decision 2026-11-22): Claude, Gemini, Groq, OpenRouter, counting only
+  providers that have a key; the two most preferred answer, and when one fails,
+  hits a rate limit or returns invalid JSON, the next one in the order takes its
+  place. Claude is paid (the user approved this exception to "free plans only");
+  without a Claude key it's Gemini + Groq with OpenRouter as the fallback. Check
+  each provider's CURRENT official docs for its model IDs and request format.
+  NEVER hardcode model names from memory; make each model ID an env var with a
+  documented default (the admin panel can override keys and models).
   - Models must return JSON only, in this shape:
     `[{"n":1,"type":"mc","answer":"a"},{"n":2,"type":"tf","answer":"V"},{"n":3,"type":"open","answer":"..."}]`.
     Open answers: simple Spanish, at most ~12 words.
@@ -80,7 +97,10 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Server: SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY (convert
   literal "\n" to newlines), R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID,
   R2_SECRET_ACCESS_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY, GEMINI_API_KEY,
-  GROQ_API_KEY, OPENROUTER_API_KEY, SESSION_SECRET, CRON_SECRET.
+  GROQ_API_KEY, OPENROUTER_API_KEY, SESSION_SECRET, CRON_SECRET, ADMIN_PASSWORD.
+  Optional: ANTHROPIC_API_KEY, CLAUDE_MODEL, GEMINI_MODEL, GROQ_MODEL,
+  OPENROUTER_MODEL (AI keys and models can also be set in the admin panel, which
+  wins over Vercel).
 - Client (public, inlined at build time): EXPO_PUBLIC_API_URL,
   EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Ask the user for
   the two Supabase values when a slice needs them; they are safe to commit.
@@ -274,6 +294,35 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Answers use the `answer` text style (bold 32/40); on display only, the "?" is
   glued to its answer with a non-breaking space and web keeps the double spaces.
 - Checked at 360 px and 430 px with no horizontal overflow (Playwright, mocked /api).
+
+### Admin, invite-only accounts and AI keys (added 2026-11-22)
+
+- Account state lives in the fixed `users.password_hash` cell
+  (`server/accountState.ts`): bcrypt hash = active; `setup:v1:<hmac>:<expiresMs>:<tries>`
+  = waiting for a one-time code; `deleted:v1:<iso>` = deleted (the row is reused
+  if the admin re-creates that username, with a new user_id).
+- Session tokens carry `pv` (a fingerprint of password_hash). `authenticate()` in
+  `server/context.ts` reads the user on every request: reset/deleted accounts and
+  old passwords are signed out on every device.
+- `POST /api/auth/activate` replaces the old register endpoint. Screen: `/activar`
+  (AuthForm mode "activate"); "Tengo un código" on the sign-in screen.
+- Admin API: one function `api/admin.ts` (route list at its top), rewrite
+  `/api/admin/:path*` like spaces. Admin token `a1.<…>.<HMAC>` (12 h, memory only
+  in the app); sign-in compares HMACs of ADMIN_PASSWORD, 8 failures per IP lock
+  15 min (per instance). Screen `src/app/admin.tsx`, panels in `src/features/admin/`.
+- AI keys/models: `server/settings.ts` (tab "ajustes", created on first save,
+  30 s cache), keys AES-256-GCM encrypted with a key derived from SESSION_SECRET
+  (`server/secretbox.ts`; changing SESSION_SECRET makes stored keys unreadable, so
+  re-enter them). `server/ai/config.ts` resolves admin > Vercel > default, builds
+  providers in order, and `testProviderKey` uses free endpoints (model lookups,
+  key info). The admin UI only ever sees the last 4 characters of a key.
+- Claude: `server/ai/claude.ts`, official `@anthropic-ai/sdk`, default model
+  `claude-opus-5-5`, effort `medium`, server-side refusal fallbacks
+  (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`), maxRetries 0.
+- `analyzePhoto(providers, …)` takes the ordered list; per-call timeout 26 s and
+  no new fallback after ~28 s so a photo stays inside Vercel's 60 s.
+- Expo Router: `Stack.Protected` groups need explicit `redirectTo` (signed out →
+  `/login`, signed in → `/`), otherwise a signed-out visitor lands on `/admin`.
 
 ### Android signing (GitHub secrets)
 

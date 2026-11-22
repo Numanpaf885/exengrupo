@@ -11,7 +11,8 @@ interface AuthState {
   token: string | null;
   /** Returns a Spanish error message, or null on success. */
   login(username: string, password: string): Promise<string | null>;
-  register(username: string, password: string): Promise<string | null>;
+  /** First sign-in with the one-time code from the admin. */
+  activate(username: string, code: string, password: string): Promise<string | null>;
   logout(): Promise<void>;
 }
 
@@ -55,8 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [signOut]);
 
-  const authenticate = useCallback(async (path: string, username: string, password: string) => {
-    const res = await api<StoredSession>(path, { method: 'POST', body: { username, password } });
+  const authenticate = useCallback(async (path: string, body: Record<string, string>) => {
+    const res = await api<StoredSession>(path, { method: 'POST', body });
     if (!res.ok) return res.error;
     await saveSession(serializeSession(res.data));
     setSession(res.data);
@@ -69,8 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user: session?.user ?? null,
       token: session?.token ?? null,
-      login: (u, p) => authenticate('/api/auth/login', u, p),
-      register: (u, p) => authenticate('/api/auth/register', u, p),
+      login: (username, password) => authenticate('/api/auth/login', { username, password }),
+      activate: (username, code, password) => authenticate('/api/auth/activate', { username, code, password }),
       logout: signOut,
     }),
     [status, session, authenticate, signOut],

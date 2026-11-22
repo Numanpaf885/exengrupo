@@ -65,7 +65,7 @@ export async function createPost(
   spaceId: string,
   photo: Uint8Array | null,
 ): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;
@@ -120,7 +120,7 @@ async function usernames(deps: DataDeps): Promise<Map<string, string>> {
 }
 
 export async function listPosts(deps: DataDeps, auth: string | null, spaceId: string): Promise<Result> {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;
@@ -135,7 +135,7 @@ export async function listPosts(deps: DataDeps, auth: string | null, spaceId: st
 }
 
 export async function getPost(deps: DataDeps, auth: string | null, spaceId: string, postId: string) {
-  const session = authenticate(deps, auth);
+  const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;

@@ -1,53 +1,60 @@
 import { useRef, useState } from 'react';
 import { StyleSheet, type TextInputInstance, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { HiddenAdminTitle } from '@/components/HiddenAdminTitle';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { TextField } from '@/components/TextField';
-import { passwordError, usernameError } from '@/lib/auth/validation';
+import { passwordError } from '@/lib/auth/validation';
 import { space } from '@/theme/tokens';
 
 interface Props {
-  mode: 'login' | 'register';
-  onSubmit(username: string, password: string): Promise<string | null>;
+  mode: 'login' | 'activate';
+  /** Returns a Spanish error message, or null on success. `code` is only sent when activating. */
+  onSubmit(username: string, password: string, code: string): Promise<string | null>;
   onSwitch(): void;
 }
 
-/** Shared Swiss login / register form. All text in Spanish. */
+/** Swiss sign-in / account activation (one-time code from the admin). All text in Spanish. */
 export function AuthForm({ mode, onSubmit, onSwitch }: Props) {
-  const isRegister = mode === 'register';
+  const activating = mode === 'activate';
   const [username, setUsername] = useState('');
+  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const codeRef = useRef<TextInputInstance>(null);
   const passwordRef = useRef<TextInputInstance>(null);
   const repeatRef = useRef<TextInputInstance>(null);
 
   const submit = async () => {
     if (busy) return;
-    const local = isRegister
-      ? (usernameError(username) ??
-        passwordError(password) ??
-        (password !== repeat ? 'Las contraseñas no coinciden.' : null))
-      : !username.trim() || !password
-        ? 'Escribe tu usuario y tu contraseña.'
-        : null;
+    const local = !username.trim()
+      ? 'Escribe tu usuario.'
+      : activating
+        ? code.replace(/[\s-]/g, '').length !== 12
+          ? 'El código tiene 12 caracteres (XXXX-XXXX-XXXX).'
+          : (passwordError(password) ?? (password !== repeat ? 'Las contraseñas no coinciden.' : null))
+        : !password
+          ? 'Escribe tu contraseña.'
+          : null;
     if (local) {
       setError(local);
       return;
     }
     setBusy(true);
     setError(null);
-    const message = await onSubmit(username, password);
+    const message = await onSubmit(username, password, code);
     setBusy(false);
     if (message) setError(message);
   };
 
   return (
     <Screen>
-      <Text variant="display">exengrupo</Text>
-      <Text variant="title">{isRegister ? 'Crear cuenta' : 'Entrar'}</Text>
+      <HiddenAdminTitle />
+      <Text variant="title">{activating ? 'Activar cuenta' : 'Entrar'}</Text>
+      {activating && <Text>Escribe tu usuario y el código de un solo uso que te dio el administrador, y elige tu contraseña.</Text>}
       <View style={styles.fields}>
         <TextField
           label="Usuario"
@@ -56,21 +63,35 @@ export function AuthForm({ mode, onSubmit, onSwitch }: Props) {
           autoComplete="username"
           textContentType="username"
           returnKeyType="next"
-          onSubmitEditing={() => passwordRef.current?.focus()}
+          onSubmitEditing={() => (activating ? codeRef.current?.focus() : passwordRef.current?.focus())}
           maxLength={20}
         />
+        {activating && (
+          <TextField
+            ref={codeRef}
+            label="Código de un solo uso (XXXX-XXXX-XXXX)"
+            value={code}
+            onChangeText={(t) => setCode(t.toUpperCase())}
+            autoCapitalize="characters"
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+            maxLength={16}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+          />
+        )}
         <TextField
           ref={passwordRef}
-          label="Contraseña"
+          label={activating ? 'Nueva contraseña' : 'Contraseña'}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          autoComplete={isRegister ? 'new-password' : 'current-password'}
-          textContentType={isRegister ? 'newPassword' : 'password'}
-          returnKeyType={isRegister ? 'next' : 'go'}
-          onSubmitEditing={() => (isRegister ? repeatRef.current?.focus() : void submit())}
+          autoComplete={activating ? 'new-password' : 'current-password'}
+          textContentType={activating ? 'newPassword' : 'password'}
+          returnKeyType={activating ? 'next' : 'go'}
+          onSubmitEditing={() => (activating ? repeatRef.current?.focus() : void submit())}
         />
-        {isRegister && (
+        {activating && (
           <TextField
             ref={repeatRef}
             label="Repite la contraseña"
@@ -84,7 +105,7 @@ export function AuthForm({ mode, onSubmit, onSwitch }: Props) {
           />
         )}
       </View>
-      {isRegister && <Text>Usuario: 3 a 20 letras, números, punto o guion. Contraseña: mínimo 8 caracteres.</Text>}
+      {activating && <Text>La contraseña necesita al menos 8 caracteres. El código caduca a las 72 horas.</Text>}
       {error && (
         <Text variant="label" accessibilityRole="alert">
           {error}
@@ -92,12 +113,12 @@ export function AuthForm({ mode, onSubmit, onSwitch }: Props) {
       )}
       <View style={styles.actions}>
         <Button
-          label={busy ? (isRegister ? 'Creando…' : 'Entrando…') : isRegister ? 'Crear cuenta' : 'Entrar'}
+          label={busy ? (activating ? 'Activando…' : 'Entrando…') : activating ? 'Activar cuenta' : 'Entrar'}
           onPress={() => void submit()}
           disabled={busy}
         />
         <Button
-          label={isRegister ? 'Ya tengo cuenta' : 'Crear cuenta'}
+          label={activating ? 'Ya tengo contraseña' : 'Tengo un código'}
           kind="secondary"
           onPress={onSwitch}
           disabled={busy}
