@@ -27,7 +27,7 @@ export default function UnirseConCodigo() {
   };
 
   return (
-    <Screen onBack={() => router.back()}>
+    <Screen narrow onBack={() => router.back()}>
       <Text variant="display">Unirme</Text>
       <TextField
         label="Código del espacio"

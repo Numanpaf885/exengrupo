@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOffline } from '@/lib/connectivity';
+import { DESKTOP_COLUMN, DESKTOP_NARROW, useDesktop } from '@/lib/useDesktop';
 import { colors, fonts, rule, space, type } from '@/theme/tokens';
 import { FadeIn } from './FadeIn';
 import { Text } from './Text';
@@ -16,6 +17,8 @@ interface Props {
   /** Pull to refresh (Android). */
   onRefresh?: () => void;
   refreshing?: boolean;
+  /** Forms (sign-in, create, join): a narrow, vertically centred column on desktop. */
+  narrow?: boolean;
 }
 
 // iOS-style frosted material for the bottom bar where the browser supports it.
@@ -28,7 +31,73 @@ const frosted =
  * Grouped light-gray page with a 16 px gutter, a small nav row (‹ Atrás + links),
  * the offline banner and an optional frosted footer. Content fades in on mount.
  */
-export function Screen({ children, onBack, headerRight, footer, onRefresh, refreshing }: Props) {
+export function Screen(props: Props) {
+  const desktop = useDesktop();
+  return desktop ? <DesktopScreen {...props} /> : <MobileScreen {...props} />;
+}
+
+function BackLink({ onBack }: { onBack: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Atrás"
+      onPress={onBack}
+      hitSlop={12}
+      style={({ pressed }) => [styles.back, pressed && { opacity: 0.4 }]}
+    >
+      <Text style={styles.backChevron}>‹</Text>
+      <Text style={styles.backLabel}>Atrás</Text>
+    </Pressable>
+  );
+}
+
+function OfflineBanner() {
+  return (
+    <FadeIn offset={-8}>
+      <View style={styles.offline} accessibilityRole="alert">
+        <Text variant="label" style={styles.offlineText}>
+          Sin conexión. Revisa tu internet.
+        </Text>
+      </View>
+    </FadeIn>
+  );
+}
+
+/**
+ * Desktop browsers: a centred column (760 px, or 440 px for forms) with a
+ * toolbar on top — ‹ Atrás on the left, the links and the screen's main
+ * actions (the mobile footer) as compact buttons on the right.
+ */
+function DesktopScreen({ children, onBack, headerRight, footer, narrow }: Props) {
+  const offline = useOffline();
+  const toolbar = !!onBack || !!headerRight || !!footer;
+  return (
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.root}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.deskContent, narrow && styles.deskCentered]}
+      >
+        <View style={[styles.deskColumn, { maxWidth: narrow ? DESKTOP_NARROW : DESKTOP_COLUMN }]}>
+          {toolbar && (
+            <View style={styles.deskToolbar}>
+              {onBack ? <BackLink onBack={onBack} /> : <View />}
+              <View style={styles.deskToolbarRight}>
+                {headerRight}
+                {footer && <View style={styles.deskActions}>{footer}</View>}
+              </View>
+            </View>
+          )}
+          {offline && <OfflineBanner />}
+          <FadeIn style={styles.deskBody}>{children}</FadeIn>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+/** Phones (Android app and the iPhone web app): unchanged mobile layout. */
+function MobileScreen({ children, onBack, headerRight, footer, onRefresh, refreshing }: Props) {
   const insets = useSafeAreaInsets();
   const offline = useOffline();
   const hasHeader = !!onBack || !!headerRight;
@@ -53,32 +122,11 @@ export function Screen({ children, onBack, headerRight, footer, onRefresh, refre
       >
         {hasHeader && (
           <View style={styles.header}>
-            {onBack ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Atrás"
-                onPress={onBack}
-                hitSlop={12}
-                style={({ pressed }) => [styles.back, pressed && { opacity: 0.4 }]}
-              >
-                <Text style={styles.backChevron}>‹</Text>
-                <Text style={styles.backLabel}>Atrás</Text>
-              </Pressable>
-            ) : (
-              <View />
-            )}
+            {onBack ? <BackLink onBack={onBack} /> : <View />}
             {headerRight && <View style={styles.headerRight}>{headerRight}</View>}
           </View>
         )}
-        {offline && (
-          <FadeIn offset={-8}>
-            <View style={styles.offline} accessibilityRole="alert">
-              <Text variant="label" style={styles.offlineText}>
-                Sin conexión. Revisa tu internet.
-              </Text>
-            </View>
-          </FadeIn>
-        )}
+        {offline && <OfflineBanner />}
         <FadeIn style={styles.body}>{children}</FadeIn>
       </ScrollView>
       {footer && (
@@ -99,6 +147,13 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', gap: space(2.5) },
   content: { paddingHorizontal: space(2), gap: space(2), alignItems: 'stretch', flexGrow: 1 },
   body: { gap: space(3) },
+  deskContent: { flexGrow: 1, alignItems: 'center', paddingHorizontal: space(4), paddingTop: space(5), paddingBottom: space(8) },
+  deskCentered: { justifyContent: 'center' },
+  deskColumn: { width: '100%', gap: space(3) },
+  deskToolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44, gap: space(2) },
+  deskToolbarRight: { flexDirection: 'row', alignItems: 'center', gap: space(3) },
+  deskActions: { flexDirection: 'row', gap: space(1) },
+  deskBody: { gap: space(3) },
   footer: {
     position: 'absolute',
     left: 0,

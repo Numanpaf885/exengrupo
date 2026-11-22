@@ -1,4 +1,5 @@
 import { Animated, Pressable, StyleSheet } from 'react-native';
+import { useDesktop } from '@/lib/useDesktop';
 import { colors, fonts, radius, space, type } from '@/theme/tokens';
 import { Text } from './Text';
 import { usePressScale } from './usePressScale';
@@ -23,8 +24,17 @@ interface Props {
   large?: boolean;
 }
 
+/** react-native-web adds `hovered` to the Pressable state; native never sets it. */
+export const hovered = (state: object): boolean => !!(state as { hovered?: boolean }).hovered;
+
 export function Button({ label, onPress, kind = 'primary', disabled, flex, trailing, small, large }: Props) {
   const press = usePressScale(kind === 'ghost' ? 1 : 0.97);
+  // Desktop browsers: the mobile footer buttons become compact toolbar buttons.
+  const toolbar = useDesktop() && !!flex;
+  if (toolbar) {
+    flex = false;
+    large = false;
+  }
   const color = kind === 'primary' ? colors.onAccent : kind === 'selected' ? colors.black : colors.accentText;
   const ghost = kind === 'ghost';
   return (
@@ -38,12 +48,14 @@ export function Button({ label, onPress, kind = 'primary', disabled, flex, trail
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
         hitSlop={ghost || small ? 8 : undefined}
-        style={({ pressed }) => [
+        style={(state) => [
           styles.base,
           styles[kind],
           small && styles.small,
           large && styles.large,
-          pressed && (ghost ? styles.ghostPressed : styles.pressed),
+          toolbar && styles.toolbar,
+          hovered(state) && (ghost ? styles.ghostPressed : styles.hover),
+          state.pressed && (ghost ? styles.ghostPressed : styles.pressed),
         ]}
       >
         <Text style={[ghost ? styles.ghostLabel : small ? styles.smallLabel : large ? styles.largeLabel : styles.label, { color }]} numberOfLines={1}>
@@ -72,6 +84,8 @@ const styles = StyleSheet.create({
   destructive: { backgroundColor: colors.surface },
   ghost: { minHeight: 44, paddingHorizontal: 0, borderRadius: 0, justifyContent: 'flex-start', gap: space(0.5) },
   large: { minHeight: 64, borderRadius: radius.lg },
+  toolbar: { minHeight: 40, paddingHorizontal: space(2.5), borderRadius: radius.sm },
+  hover: { opacity: 0.9 },
   small: { minHeight: 32, paddingHorizontal: space(1.5), borderRadius: radius.pill },
   pressed: { opacity: 0.8 },
   ghostPressed: { opacity: 0.4 },

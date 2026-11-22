@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colors, radius, rule, space } from '@/theme/tokens';
+import { hovered } from './Button';
 import { useRowIndex } from './Section';
 import { Text } from './Text';
 
@@ -45,7 +46,7 @@ export function ListRow({ children, onPress, onPressIn, label, leading, trailing
       accessibilityLabel={label}
       onPress={onPress}
       onPressIn={onPressIn}
-      style={({ pressed }) => [style, pressed && styles.pressed]}
+      style={(state) => [style, (state.pressed || hovered(state)) && styles.pressed]}
     >
       {body}
     </Pressable>

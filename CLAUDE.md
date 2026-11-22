@@ -321,6 +321,17 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Speed: `src/lib/memo.ts` in-memory stale-while-revalidate cache (cleared on
   logout) + `src/features/spaces/cache.ts`; touching a space row prefetches it.
 
+### Desktop layout (added 2026-11-22, user request)
+
+- Only web windows ≥ 900 px wide (`useDesktop()` in `src/lib/useDesktop.ts`) get it;
+  the Android app and phone browsers keep the mobile layout unchanged.
+- `Screen` renders `DesktopScreen`: a centred 760 px column (440 px and vertically
+  centred for forms: `narrow` on sign-in/activate, crear, unirse), a toolbar with
+  "‹ Atrás" on the left and the header links plus the mobile footer actions as
+  compact buttons on the right. `Button` with `flex` becomes a compact toolbar
+  button on desktop. Rows and buttons get hover states (react-native-web `hovered`).
+- Camera on desktop: the preview stays full width; the controls are a 480 px column.
+
 ### Reference files (added 2026-11-22, user request)
 
 - Members add PDF / JPG / PNG / .txt / .md / .docx to a space (screen
