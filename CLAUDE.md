@@ -322,8 +322,15 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Camera: full screen, never scrolls (`src/features/camera/CameraChrome.tsx`):
   top bar (Volver + lens status), preview fills the middle, shutter + "Cámara del
   teléfono" at the bottom, white flash + haptic tick on capture (expo-haptics).
-  Taking a photo closes the camera at once; compression runs in the background
-  (`startUpload(spaceId, prepare, token)`, rows show "Preparando…" → "Enviando y analizando…").
+  The photo is compressed on the camera screen first ("Preparando la foto…", about
+  a second), then the camera closes and the upload continues in the background
+  (`startUpload`, rows show "Enviando y analizando…"). (Compressing after the camera
+  had closed stopped Android photos from being sent, 2026-11-22.)
+- Android + phone camera app: MIUI often closes exengrupo while the camera app is
+  open. The space id is kept in SecureStore before launching it and
+  `RecoverPendingPhoto` (root layout) sends the photo from
+  `ImagePicker.getPendingResultAsync()` when the app restarts.
+- The server logs every rejected photo (`photo rejected (status): reason bytes=N`).
 - Speed: `src/lib/memo.ts` in-memory stale-while-revalidate cache (cleared on
   logout) + `src/features/spaces/cache.ts`; touching a space row prefetches it.
 

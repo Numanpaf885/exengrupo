@@ -74,9 +74,13 @@ export async function createPost(
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
   if (isResult(m)) return m;
-  if (!photo || photo.length === 0) return fail(400, POST_MSG.noPhoto);
-  if (photo.length > MAX_PHOTO_BYTES) return fail(413, POST_MSG.tooBig);
-  if (!isJpeg(photo)) return fail(415, POST_MSG.notJpeg);
+  const reject = (status: number, message: string) => {
+    deps.log(`photo rejected (${status}): ${message} bytes=${photo?.length ?? 0}`);
+    return fail(status, message);
+  };
+  if (!photo || photo.length === 0) return reject(400, POST_MSG.noPhoto);
+  if (photo.length > MAX_PHOTO_BYTES) return reject(413, POST_MSG.tooBig);
+  if (!isJpeg(photo)) return reject(415, POST_MSG.notJpeg);
 
   const postId = deps.newId();
   const key = photoKey(spaceId, postId);
