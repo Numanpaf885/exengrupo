@@ -69,6 +69,8 @@ jobs:
         env:
           # Public, inlined into the JS bundle at build time.
           EXPO_PUBLIC_API_URL: https://exengrupo.vercel.app
+          # Same as versionCode: the in-app update check compares it with the latest Release.
+          EXPO_PUBLIC_BUILD_NUMBER: ${{ github.run_number }}
           # Public Supabase values (repository Variables, not secrets). Without them: no live updates.
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}

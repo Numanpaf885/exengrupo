@@ -14,6 +14,7 @@ import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { SpaceSummary } from '@/features/spaces/api';
 import { cachedSpaces, loadSpaces, prefetchSpace } from '@/features/spaces/cache';
+import { UpdateBanner } from '@/features/update/UpdateBanner';
 import { takePendingJoin } from '@/lib/pendingJoin';
 
 const members = (n: number) => (n === 1 ? '1 miembro' : `${n} miembros`);
@@ -69,6 +70,7 @@ export default function Home() {
         <Text tone="secondary">Hola, {user?.username}</Text>
       </View>
 
+      <UpdateBanner />
       <Notice text={error} />
       {spaces === null && !error && <LoadingBar label="Cargando…" />}
       {spaces?.length === 0 && (
