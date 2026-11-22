@@ -2,13 +2,17 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { FadeIn } from '@/components/FadeIn';
 import { ListRow } from '@/components/ListRow';
+import { LoadingBar } from '@/components/LoadingBar';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/features/auth/AuthContext';
 import { type SpaceDetail, spacesApi } from '@/features/spaces/api';
+import { loadSpace } from '@/features/spaces/cache';
+import { memo } from '@/lib/memo';
 import { confirmAction } from '@/lib/confirm';
 import { SPACE_NAME_MAX, spaceNameError } from '@/lib/spaces/validation';
 import { space as grid } from '@/theme/tokens';
@@ -18,15 +22,15 @@ export default function Miembros() {
   const spaceId = String(id);
   const { token, user } = useAuth();
   const router = useRouter();
-  const [space, setSpace] = useState<SpaceDetail | null>(null);
-  const [name, setName] = useState('');
+  const [space, setSpace] = useState<SpaceDetail | null>(() => memo.get<SpaceDetail>(`space:${spaceId}`) ?? null);
+  const [name, setName] = useState(() => space?.name ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
-    const res = await spacesApi.get(token, spaceId);
+    const res = await loadSpace(token, spaceId);
     if (res.ok) {
       setSpace(res.data.space);
       setName(res.data.space.name);
@@ -85,24 +89,32 @@ export default function Miembros() {
     <Screen onBack={() => router.back()}>
       <Text variant="display">Miembros</Text>
       <Notice text={error} />
-      {!space && !error && <Text>Cargando…</Text>}
+      {!space && !error && <LoadingBar label="Cargando…" />}
       <View>
-        {space?.members.map((m) => (
-          <ListRow key={m.user_id}>
-            <Text variant="title">{m.username}</Text>
-            <Text>
-              {m.is_creator ? 'Creador del espacio' : 'Miembro'}
-              {m.user_id === user?.user_id ? ' · tú' : ''}
-            </Text>
-            {space.is_creator && !m.is_creator && (
-              <Button
-                label="Quitar"
-                kind="secondary"
-                onPress={() => void removeMember(m.user_id, m.username)}
-                disabled={busy}
-              />
-            )}
-          </ListRow>
+        {space?.members.map((m, i) => (
+          <FadeIn key={m.user_id} index={i}>
+            <ListRow>
+              <View style={styles.member}>
+                <View style={styles.grow}>
+                  <Text variant="title" numberOfLines={1}>
+                    {m.username}
+                  </Text>
+                  <Text>
+                    {m.is_creator ? 'Creador del espacio' : 'Miembro'}
+                    {m.user_id === user?.user_id ? ' · tú' : ''}
+                  </Text>
+                </View>
+                {space.is_creator && !m.is_creator && (
+                  <Button
+                    label="Quitar"
+                    kind="ghost"
+                    onPress={() => void removeMember(m.user_id, m.username)}
+                    disabled={busy}
+                  />
+                )}
+              </View>
+            </ListRow>
+          </FadeIn>
         ))}
       </View>
 
@@ -127,4 +139,8 @@ export default function Miembros() {
   );
 }
 
-const styles = StyleSheet.create({ block: { gap: grid(2) } });
+const styles = StyleSheet.create({
+  block: { gap: grid(2) },
+  member: { flexDirection: 'row', alignItems: 'center', gap: grid(2) },
+  grow: { flex: 1 },
+});

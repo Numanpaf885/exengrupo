@@ -1,6 +1,7 @@
 /**
  * Photos being sent. The camera screen starts an upload and goes straight back
- * to the feed; the feed shows "Enviando…" rows and refreshes when one finishes.
+ * to the feed (compression runs in the background too); the feed shows
+ * "Preparando…" / "Enviando y analizando…" rows and refreshes when one finishes.
  */
 import { useSyncExternalStore } from 'react';
 import type { ReadyPhoto } from '@/lib/photo/types';
@@ -9,7 +10,7 @@ import { uploadPhoto } from '@/lib/photo/upload';
 export interface Upload {
   id: string;
   spaceId: string;
-  state: 'sending' | 'error';
+  state: 'preparing' | 'sending' | 'error';
   error?: string;
 }
 
@@ -25,20 +26,34 @@ function subscribe(listener: () => void) {
 
 let nextId = 0;
 
-export function startUpload(spaceId: string, photo: ReadyPhoto, token: string): void {
-  const id = `u${++nextId}`;
-  uploads = [{ id, spaceId, state: 'sending' }, ...uploads];
+const update = (id: string, patch: Partial<Upload>) => {
+  uploads = uploads.map((u) => (u.id === id ? { ...u, ...patch } : u));
   emit();
-  void uploadPhoto(spaceId, photo, token).then((res) => {
+};
+
+/** `prepare` compresses the photo; it runs after the camera screen has already closed. */
+export function startUpload(spaceId: string, prepare: () => Promise<ReadyPhoto>, token: string): void {
+  const id = `u${++nextId}`;
+  uploads = [{ id, spaceId, state: 'preparing' }, ...uploads];
+  emit();
+  void (async () => {
+    let photo: ReadyPhoto;
+    try {
+      photo = await prepare();
+    } catch {
+      return update(id, { state: 'error', error: 'No se pudo preparar la foto. Prueba de nuevo.' });
+    }
+    update(id, { state: 'sending' });
+    const res = await uploadPhoto(spaceId, photo, token);
     if (photo.blob) URL.revokeObjectURL(photo.uri);
     if (res.ok) {
       uploads = uploads.filter((u) => u.id !== id);
       finished++;
+      emit();
     } else {
-      uploads = uploads.map((u) => (u.id === id ? { ...u, state: 'error', error: res.error } : u));
+      update(id, { state: 'error', error: res.error });
     }
-    emit();
-  });
+  })();
 }
 
 export function dismissUpload(id: string): void {

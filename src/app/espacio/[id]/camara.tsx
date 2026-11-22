@@ -1,43 +1,38 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Notice } from '@/components/Notice';
-import { Screen } from '@/components/Screen';
-import { Text } from '@/components/Text';
+import { useRef } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { type CapturedPhoto, PhotoCapture } from '@/features/camera/PhotoCapture';
 import { startUpload } from '@/features/spaces/uploads';
 import { compressPhoto } from '@/lib/photo/compress';
 
+/**
+ * Full-screen camera inside a space. Taking a photo closes the camera at once;
+ * compression (long edge ≤ 2000 px, JPEG, < 3 MB) and the upload continue in
+ * the background while the feed shows the photo's progress.
+ */
 export default function Camara() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const spaceId = String(id);
   const { token } = useAuth();
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const done = useRef(false);
 
-  const onPhoto = async (photo: CapturedPhoto) => {
-    if (!token) return;
-    setBusy(true);
-    setError(null);
-    try {
-      // Long edge ≤ 2000 px, JPEG, < 3 MB — then send in the background and go back to the feed.
-      const ready = await compressPhoto(photo.uri, photo.width, photo.height);
-      startUpload(spaceId, ready, token);
-      router.back();
-    } catch {
-      setError('No se pudo preparar la foto. Prueba de nuevo.');
-      setBusy(false);
-    }
+  const back = () => (router.canGoBack() ? router.back() : router.replace(`/espacio/${spaceId}`));
+
+  const onPhoto = (photo: CapturedPhoto) => {
+    if (!token || done.current) return;
+    done.current = true;
+    const prepare = async () => {
+      try {
+        return await compressPhoto(photo.uri, photo.width, photo.height);
+      } finally {
+        // Web: free the full-size capture once the small JPEG exists.
+        if (photo.uri.startsWith('blob:')) URL.revokeObjectURL(photo.uri);
+      }
+    };
+    startUpload(spaceId, prepare, token);
+    back();
   };
 
-  return (
-    <Screen onBack={() => router.back()}>
-      <Text variant="title">Foto de las preguntas</Text>
-      <Text>Encuadra todas las preguntas. Las respuestas aparecen en el espacio para todo el grupo.</Text>
-      <PhotoCapture onPhoto={(p) => void onPhoto(p)} busy={busy} />
-      {busy && <Text variant="label">Preparando la foto…</Text>}
-      <Notice text={error} />
-    </Screen>
-  );
+  return <PhotoCapture onPhoto={onPhoto} onBack={back} />;
 }

@@ -2,12 +2,15 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Share, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { FadeIn } from '@/components/FadeIn';
 import { ListRow } from '@/components/ListRow';
+import { LoadingBar } from '@/components/LoadingBar';
 import { Notice } from '@/components/Notice';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
-import { type SpaceDetail, spacesApi } from '@/features/spaces/api';
+import { type SpaceDetail, type SpaceSummary, spacesApi } from '@/features/spaces/api';
+import { cachedPosts, cachedSpace, loadPosts, loadSpace, rememberPosts } from '@/features/spaces/cache';
 import { upsertPost } from '@/features/spaces/feed';
 import { dismissUpload, useUploads } from '@/features/spaces/uploads';
 import { displayAnswer } from '@/lib/answerDisplay';
@@ -15,23 +18,30 @@ import { realtimeConfigured, WEB_URL } from '@/lib/config';
 import type { PostView } from '@/lib/photo/upload';
 import { subscribeToSpace } from '@/lib/realtime';
 import { formatPostTime } from '@/lib/time';
-import { space as grid } from '@/theme/tokens';
+import { rule, space as grid } from '@/theme/tokens';
 
 function PostItem({ post }: { post: PostView }) {
-  const processing = post.status === 'processing';
   return (
     <ListRow>
       <Text>
         {post.username} · {formatPostTime(post.created_at)}
       </Text>
-      {processing ? (
-        <Text variant="title">Analizando…</Text>
-      ) : post.status === 'error' ? (
-        <Text variant="title">{post.answer || 'No se pudo analizar la foto. Prueba de nuevo.'}</Text>
+      {post.status === 'processing' ? (
+        <View style={styles.pending}>
+          <Text variant="title">Analizando…</Text>
+          <LoadingBar label="Analizando…" />
+        </View>
       ) : (
-        <Text variant="answer" selectable style={keepSpaces}>
-          {displayAnswer(post.answer)}
-        </Text>
+        // Keyed by status so the answer fades in when "Analizando…" turns into it.
+        <FadeIn key={post.status} offset={8}>
+          {post.status === 'error' ? (
+            <Text variant="title">{post.answer || 'No se pudo analizar la foto. Prueba de nuevo.'}</Text>
+          ) : (
+            <Text variant="answer" selectable style={keepSpaces}>
+              {displayAnswer(post.answer)}
+            </Text>
+          )}
+        </FadeIn>
       )}
     </ListRow>
   );
@@ -42,15 +52,27 @@ export default function Espacio() {
   const spaceId = String(id);
   const { token } = useAuth();
   const router = useRouter();
-  const [space, setSpace] = useState<SpaceDetail | null>(null);
-  const [posts, setPosts] = useState<PostView[] | null>(null);
+  // Open instantly with what the list (or the last visit) already knows.
+  const [space, setSpace] = useState<SpaceDetail | SpaceSummary | null>(() => cachedSpace(spaceId) ?? null);
+  const [posts, setPostsState] = useState<PostView[] | null>(() => cachedPosts(spaceId) ?? null);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const uploads = useUploads(spaceId);
+
+  const setPosts = useCallback(
+    (update: (prev: PostView[] | null) => PostView[]) =>
+      setPostsState((prev) => {
+        const next = update(prev);
+        rememberPosts(spaceId, next);
+        return next;
+      }),
+    [spaceId],
+  );
 
   const load = useCallback(async () => {
     if (!token) return;
-    const [s, p] = await Promise.all([spacesApi.get(token, spaceId), spacesApi.posts(token, spaceId)]);
+    const [s, p] = await Promise.all([loadSpace(token, spaceId), loadPosts(token, spaceId)]);
     if (!s.ok) {
       setError(s.error);
       setNotFound(s.status === 404);
@@ -58,7 +80,7 @@ export default function Espacio() {
     }
     setSpace(s.data.space);
     if (p.ok) {
-      setPosts(p.data.posts);
+      setPostsState(p.data.posts);
       setError(null);
     } else {
       setError(p.error);
@@ -77,7 +99,7 @@ export default function Espacio() {
   }, [uploads.finished, load]);
 
   // Live: the server broadcasts only { post_id }; fetch that post with my session.
-  const channelId = space?.channel_id;
+  const channelId = space && 'channel_id' in space ? space.channel_id : undefined;
   useEffect(() => {
     if (!channelId || !token) return;
     return subscribeToSpace(channelId, (postId) => {
@@ -85,7 +107,15 @@ export default function Espacio() {
         if (res.ok) setPosts((prev) => upsertPost(prev ?? [], res.data.post));
       });
     });
-  }, [channelId, token, spaceId]);
+  }, [channelId, token, spaceId, setPosts]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
   const share = () => {
     if (!space) return;
@@ -104,50 +134,87 @@ export default function Espacio() {
     );
   }
 
+  const empty = posts?.length === 0 && uploads.list.length === 0;
+
   return (
-    <Screen onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
-      <Text variant="display">{space?.name ?? ' '}</Text>
-      <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} />
+    <Screen
+      onBack={back}
+      onRefresh={() => void refresh()}
+      refreshing={refreshing}
+      headerRight={
+        space && (
+          <>
+            <Button kind="ghost" label="Invitar" onPress={share} />
+            <Button
+              kind="ghost"
+              label={`Miembros (${space.member_count})`}
+              onPress={() => router.push(`/espacio/${spaceId}/miembros`)}
+            />
+          </>
+        )
+      }
+      footer={
+        <Button
+          label="Tomar foto"
+          onPress={() => router.push(`/espacio/${spaceId}/camara`)}
+          disabled={!space}
+          flex
+          trailing="→"
+        />
+      }
+    >
+      <View>
+        <Text variant="display" numberOfLines={3}>
+          {space?.name ?? ' '}
+        </Text>
+        {space && (
+          <Text variant="label" selectable>
+            Código {space.join_code}
+          </Text>
+        )}
+      </View>
 
       <Notice text={error} />
       {error && <Button label="Reintentar" kind="secondary" onPress={() => void load()} />}
 
-      <View>
+      <View style={posts?.length || uploads.list.length ? styles.feed : undefined}>
         {uploads.list.map((u) => (
-          <ListRow key={u.id}>
-            <Text>Tu foto</Text>
-            {u.state === 'sending' ? (
-              <Text variant="title">Enviando y analizando…</Text>
-            ) : (
-              <>
-                <Notice text={u.error} />
-                <Button label="Descartar" kind="secondary" onPress={() => dismissUpload(u.id)} />
-              </>
-            )}
-          </ListRow>
+          <FadeIn key={u.id}>
+            <ListRow>
+              <Text>Tu foto</Text>
+              {u.state === 'error' ? (
+                <>
+                  <Notice text={u.error} />
+                  <Button label="Descartar" kind="secondary" onPress={() => dismissUpload(u.id)} />
+                </>
+              ) : (
+                <View style={styles.pending}>
+                  <Text variant="title">{u.state === 'preparing' ? 'Preparando…' : 'Enviando y analizando…'}</Text>
+                  <LoadingBar label="Enviando y analizando…" />
+                </View>
+              )}
+            </ListRow>
+          </FadeIn>
         ))}
-        {posts?.map((p) => <PostItem key={p.post_id} post={p} />)}
-        {posts === null && !error && <Text>Cargando…</Text>}
-        {posts?.length === 0 && uploads.list.length === 0 && (
-          <Text>Aún no hay fotos. Toma la primera: las respuestas aparecen aquí para todo el grupo.</Text>
-        )}
+        {posts?.map((p, i) => (
+          <FadeIn key={p.post_id} index={i}>
+            <PostItem post={p} />
+          </FadeIn>
+        ))}
       </View>
+      {posts === null && !error && <LoadingBar label="Cargando…" />}
+      {empty && (
+        <FadeIn>
+          <View style={styles.empty}>
+            <Text variant="title">Aún no hay fotos.</Text>
+            <Text>Pulsa «Tomar foto» y encuadra las preguntas: las respuestas aparecen aquí para todo el grupo.</Text>
+          </View>
+        </FadeIn>
+      )}
 
-      {space && (
-        <View style={styles.block}>
-          <ListRow>
-            <Text variant="label">Código para unirse</Text>
-            <Text variant="title" selectable>
-              {space.join_code}
-            </Text>
-          </ListRow>
-          <Button label="Compartir invitación" kind="secondary" onPress={share} />
-          <Button
-            label={`Miembros (${space.member_count})`}
-            kind="secondary"
-            onPress={() => router.push(`/espacio/${spaceId}/miembros`)}
-          />
-          <Button label="Actualizar" kind="secondary" onPress={() => void load()} />
+      {(Platform.OS === 'web' || !realtimeConfigured) && (
+        <View style={styles.more}>
+          <Button kind="ghost" label="Actualizar" onPress={() => void refresh()} />
           {!realtimeConfigured && <Text>Las respuestas nuevas aparecen al pulsar Actualizar.</Text>}
         </View>
       )}
@@ -158,4 +225,9 @@ export default function Espacio() {
 // Browsers collapse the double spaces between answers unless told not to.
 const keepSpaces = Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap' } as object) : undefined;
 
-const styles = StyleSheet.create({ block: { gap: grid(2) } });
+const styles = StyleSheet.create({
+  feed: { borderBottomWidth: rule.width, borderBottomColor: rule.color },
+  pending: { gap: grid(1) },
+  empty: { gap: grid(1), paddingVertical: grid(2) },
+  more: { marginTop: 'auto' },
+});

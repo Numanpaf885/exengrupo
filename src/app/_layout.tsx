@@ -14,13 +14,24 @@ function RootNavigator() {
   if (status === 'loading') return blank;
   const signedIn = status === 'signedIn';
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+        animation: 'slide_from_right',
+        animationDuration: 260,
+        gestureEnabled: true,
+      }}
+    >
       <Stack.Protected guard={signedIn} redirectTo="/login">
         <Stack.Screen name="index" />
         <Stack.Screen name="crear" />
         <Stack.Screen name="unirse/index" />
         <Stack.Screen name="espacio/[id]/index" />
-        <Stack.Screen name="espacio/[id]/camara" />
+        <Stack.Screen
+          name="espacio/[id]/camara"
+          options={{ animation: 'fade_from_bottom', contentStyle: { backgroundColor: colors.text } }}
+        />
         <Stack.Screen name="espacio/[id]/miembros" />
         <Stack.Screen name="lente" />
       </Stack.Protected>
