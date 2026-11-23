@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Share, StyleSheet, View } from 'react-native';
+import { Platform, Share, StyleSheet, Switch, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { ListRow } from '@/components/ListRow';
 import { Notice } from '@/components/Notice';
@@ -91,6 +91,13 @@ export function UsersPanel({ onSessionEnded }: { onSessionEnded: () => void }) {
     }
   };
 
+  const toggleCreator = async (u: AdminUser, canCreate: boolean) => {
+    // Show the change at once; reload puts it back if the server refused.
+    setUsers((list) => list?.map((x) => (x.user_id === u.user_id ? { ...x, can_create: canCreate } : x)) ?? null);
+    const res = await adminApi.setCreator(u.user_id, canCreate);
+    if (!handle(res)) void load();
+  };
+
   const remove = async (u: AdminUser) => {
     const ok = await confirmAction(
       'Eliminar usuario',
@@ -130,6 +137,19 @@ export function UsersPanel({ onSessionEnded }: { onSessionEnded: () => void }) {
             <Text variant="title">{u.username}</Text>
             <Text>{userStatusText(u)}</Text>
             <Text>{u.spaces === 1 ? '1 espacio' : `${u.spaces} espacios`}</Text>
+            <View style={styles.switchRow}>
+              <Text style={styles.grow}>Puede crear espacios</Text>
+              <Switch
+                accessibilityLabel={`${u.username} puede crear espacios`}
+                value={u.can_create}
+                onValueChange={(v) => void toggleCreator(u, v)}
+                trackColor={{ true: colors.accent, false: colors.fill }}
+                thumbColor={colors.white}
+                ios_backgroundColor={colors.fill}
+                // react-native-web reads the "on" thumb colour from its own prop (default teal).
+                {...({ activeThumbColor: colors.white } as object)}
+              />
+            </View>
             <View style={styles.rowActions}>
               <Button label="Nuevo código" kind="secondary" onPress={() => void reset(u)} disabled={busy} />
               <Button label="Eliminar" kind="secondary" onPress={() => void remove(u)} disabled={busy} />
@@ -145,6 +165,8 @@ export function UsersPanel({ onSessionEnded }: { onSessionEnded: () => void }) {
 const styles = StyleSheet.create({
   block: { gap: space(2) },
   rowActions: { gap: space(1), marginTop: space(1) },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: space(1), marginTop: space(1) },
+  grow: { flex: 1 },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space(2), gap: space(2) },
   // 14 characters on one line even at 360 px.
   code: { fontSize: 24, lineHeight: 32 },

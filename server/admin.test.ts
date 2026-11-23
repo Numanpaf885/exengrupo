@@ -15,14 +15,13 @@ import {
   testKey,
 } from './admin';
 import { listMySpaces, createSpace, joinSpace } from './spaces';
-import { memorySettings } from './settings';
 import { bearer, TEST_NOW, TEST_SECRET, testDeps } from './testing';
 import { adminPath, matchAdminRoute } from './router';
 import { decryptSecret } from './secretbox';
 
 function adminDeps(over: Partial<AdminDeps> = {}) {
   const base = testDeps([{ id: 'boss', name: 'boss' }]);
-  const settings = memorySettings();
+  const settings = base.settings; // boss may create spaces
   const testKeyFn = vi.fn(async () => ({ ok: true, message: 'Clave válida.' }));
   const deps: AdminDeps = {
     ...base,

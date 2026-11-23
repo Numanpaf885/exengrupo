@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { colors, radius, rule, space } from '@/theme/tokens';
+import { colors, fonts, radius, rule, space } from '@/theme/tokens';
 import { hovered } from './Button';
 import { useRowIndex } from './Section';
 import { Text } from './Text';
@@ -15,6 +15,8 @@ interface Props {
   leading?: ReactNode;
   /** Right accessory (chip, link). */
   trailing?: ReactNode;
+  /** Makes the row a checkbox (iOS-style tick on the right instead of the chevron). */
+  checked?: boolean;
 }
 
 /**
@@ -22,7 +24,8 @@ interface Props {
  * above every row but the first); on its own it is a small card. Pressable
  * rows highlight on touch and show a chevron.
  */
-export function ListRow({ children, onPress, onPressIn, label, leading, trailing }: Props) {
+export function ListRow({ children, onPress, onPressIn, label, leading, trailing, checked }: Props) {
+  const checkbox = checked !== undefined;
   const index = useRowIndex();
   const standalone = index < 0;
   const body = (
@@ -31,7 +34,12 @@ export function ListRow({ children, onPress, onPressIn, label, leading, trailing
       {leading}
       <View style={styles.grow}>{children}</View>
       {trailing}
-      {onPress && (
+      {checkbox && (
+        <View style={[styles.check, checked && styles.checkOn]} accessibilityElementsHidden importantForAccessibility="no">
+          {checked && <Text style={styles.tick}>✓</Text>}
+        </View>
+      )}
+      {onPress && !checkbox && (
         <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no">
           ›
         </Text>
@@ -42,7 +50,8 @@ export function ListRow({ children, onPress, onPressIn, label, leading, trailing
   if (!onPress) return <View style={style}>{body}</View>;
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={checkbox ? 'checkbox' : 'button'}
+      accessibilityState={checkbox ? { checked } : undefined}
       accessibilityLabel={label}
       onPress={onPress}
       onPressIn={onPressIn}
@@ -75,5 +84,16 @@ const styles = StyleSheet.create({
     backgroundColor: rule.color,
   },
   separatorLeading: { left: space(2) + 40 + space(1.5) },
+  check: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.separator,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  tick: { color: colors.onAccent, fontSize: 14, lineHeight: 16, fontFamily: fonts.bold },
   chevron: { fontSize: 24, lineHeight: 24, color: colors.separator, marginTop: -2 },
 });

@@ -1,11 +1,13 @@
 /**
  * Every /api/spaces/* route (see server/router.ts):
- *   GET    /api/spaces                         my spaces
- *   POST   /api/spaces                         create { name }
+ *   GET    /api/spaces                         my spaces + can_create
+ *   POST   /api/spaces                         create { name, member_ids? }  (allowed users only)
  *   POST   /api/spaces/join                    join { code }
+ *   GET    /api/spaces/people                  people who can be added (creators only)
  *   GET    /api/spaces/:id                     details + members
  *   PATCH  /api/spaces/:id                     rename { name }        (creator)
  *   DELETE /api/spaces/:id                     soft delete            (creator)
+ *   POST   /api/spaces/:id/members             add { user_ids }       (creator)
  *   DELETE /api/spaces/:id/members/:userId     soft remove member     (creator)
  *   GET    /api/spaces/:id/posts               feed, newest first
  *   POST   /api/spaces/:id/posts               multipart "photo" (JPEG ≤ 3 MB) → answer
@@ -22,11 +24,13 @@ import { matchSpacesRoute, spacesPath } from '../server/router';
 import { createFile, deleteFile, listFiles, processFile, uploadChunk } from '../server/files/handlers';
 import { dataDeps, fileDeps, postDeps, readJson, respond } from '../server/http';
 import {
+  addMembers,
   createSpace,
   deleteSpace,
   getSpace,
   joinSpace,
   listMySpaces,
+  listPeople,
   removeMember,
   renameSpace,
 } from '../server/spaces';
@@ -53,6 +57,10 @@ async function dispatch(request: Request): Promise<Result> {
       return createSpace(dataDeps(), auth, await readJson(request));
     case 'join':
       return joinSpace(dataDeps(), auth, await readJson(request));
+    case 'people':
+      return listPeople(dataDeps(), auth);
+    case 'addMembers':
+      return addMembers(dataDeps(), auth, route.spaceId, await readJson(request));
     case 'get':
       return getSpace(dataDeps(), auth, route.spaceId);
     case 'rename':

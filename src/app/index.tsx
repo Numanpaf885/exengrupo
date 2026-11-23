@@ -13,7 +13,7 @@ import { Card, Section } from '@/components/Section';
 import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { SpaceSummary } from '@/features/spaces/api';
-import { cachedSpaces, loadSpaces, prefetchSpace } from '@/features/spaces/cache';
+import { cachedCanCreate, cachedSpaces, loadSpaces, prefetchSpace } from '@/features/spaces/cache';
 import { UpdateBanner } from '@/features/update/UpdateBanner';
 import { takePendingJoin } from '@/lib/pendingJoin';
 
@@ -23,6 +23,8 @@ export default function Home() {
   const { user, token, logout } = useAuth();
   const router = useRouter();
   const [spaces, setSpaces] = useState<SpaceSummary[] | null>(() => cachedSpaces() ?? null);
+  // Only people the admin allowed may create spaces; everyone else is added by them (or joins with a code).
+  const [canCreate, setCanCreate] = useState(cachedCanCreate);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -31,6 +33,7 @@ export default function Home() {
     const res = await loadSpaces(token);
     if (res.ok) {
       setSpaces(res.data.spaces);
+      setCanCreate(res.data.can_create === true);
       setError(null);
     } else {
       setError(res.error);
@@ -60,8 +63,8 @@ export default function Home() {
       refreshing={refreshing}
       footer={
         <>
-          <Button label="Crear espacio" onPress={() => router.push('/crear')} flex />
-          <Button label="Unirme" kind="secondary" onPress={() => router.push('/unirse')} flex />
+          {canCreate && <Button label="Crear espacio" onPress={() => router.push('/crear')} flex />}
+          <Button label={canCreate ? 'Unirme' : 'Unirme con código'} kind="secondary" onPress={() => router.push('/unirse')} flex />
         </>
       }
     >
@@ -77,7 +80,11 @@ export default function Home() {
         <FadeIn>
           <Card>
             <Text variant="headline">Aún no tienes espacios</Text>
-            <Text tone="secondary">Crea uno para tu grupo de estudio o únete con el código de 6 letras que te pasaron.</Text>
+            <Text tone="secondary">
+              {canCreate
+                ? 'Crea uno para tu grupo de estudio y elige con quién compartirlo.'
+                : 'Cuando alguien te añada a un espacio, aparecerá aquí. También puedes unirte con el código de 6 letras que te pasen.'}
+            </Text>
           </Card>
         </FadeIn>
       )}

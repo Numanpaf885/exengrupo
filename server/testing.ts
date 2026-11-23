@@ -2,12 +2,15 @@
 import type { DataDeps } from './context';
 import type { MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
 import { signSession } from './session';
+import { CREATORS_KEY } from './creators';
+import { memorySettings } from './settings';
 import { memoryTable } from './table';
 
 export const TEST_SECRET = 'test-secret';
 export const TEST_NOW = Date.UTC(2026, 10, 21, 10, 0, 0);
 
-export function testDeps(users: Array<{ id: string; name: string }> = []) {
+/** In-memory deps. Every given user may create spaces unless `creators` says otherwise. */
+export function testDeps(users: Array<{ id: string; name: string }> = [], creators: string[] = users.map((u) => u.id)) {
   let id = 0;
   let rand = 0;
   return {
@@ -23,6 +26,7 @@ export function testDeps(users: Array<{ id: string; name: string }> = []) {
     spaces: memoryTable<SpaceRecord>(),
     members: memoryTable<MemberRecord>(),
     posts: memoryTable<PostRecord>(),
+    settings: memorySettings({ [CREATORS_KEY]: creators.join(',') }),
     secret: TEST_SECRET,
     now: () => TEST_NOW,
     newId: () => `id-${++id}`,

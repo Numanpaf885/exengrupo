@@ -21,8 +21,11 @@ Accounts are invite-only. Ask the admin for a username and a one-time code.
 
 ## 3. Join or create a space
 
-- **Crear espacio:** give it a name; you get a 6-letter code and an **Invitar** link to share.
+- **Spaces you were added to** appear on your home screen by themselves: nothing to type.
+- **Crear espacio** (only for people the admin allows): give it a name and tick who to share it with.
+  They see it at once. You also get a 6-letter code and an **Invitar** link for anyone else.
 - **Unirme:** type the 6-letter code you were sent, or just open the invite link.
+- The creator adds or removes people later in **Miembros** (**Añadir miembros**).
 
 ## 4. Get answers from a photo
 
@@ -58,6 +61,9 @@ your files first. Files are only read by the AI; nobody can open or download the
 Hold the big **exengrupo** title for 3 seconds (or tap it 7 times) on the home or sign-in screen,
 then enter the admin password.
 
-- **Usuarios:** create users (the one-time code is shown once), give a new code, delete.
+- **Usuarios:** create users (the one-time code is shown once), give a new code, delete, and switch
+  **Puede crear espacios** on or off for each person (only **numan** until you change it).
+- **Espacios:** every space with its members: create a space for anyone, add or remove members,
+  delete a space.
 - **Claves IA:** add, test or remove the AI keys and models.
 - **Uso:** photos, errors and answers per AI.

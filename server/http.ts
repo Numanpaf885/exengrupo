@@ -72,6 +72,7 @@ export function dataDeps(): DataDeps {
     spaces: sheetsTable<SpaceRecord>(client, 'spaces'),
     members: sheetsTable<MemberRecord>(client, 'members'),
     posts: sheetsTable<PostRecord>(client, 'posts'),
+    settings: settings(),
     secret: env('SESSION_SECRET'),
     now: Date.now,
     newId: randomUUID,

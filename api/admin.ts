@@ -5,12 +5,35 @@
  *   POST   /api/admin/users                  { username } → one-time code (shown once)
  *   POST   /api/admin/users/:id/reset        new one-time code, signs the person out everywhere
  *   DELETE /api/admin/users/:id              delete account + remove from every space
+ *   PUT    /api/admin/users/:id/creator      { can_create } may this user create spaces
+ *   GET    /api/admin/spaces                 every space with its members
+ *   POST   /api/admin/spaces                 { name, creator_id, member_ids? } create for a user
+ *   DELETE /api/admin/spaces/:id             soft delete
+ *   POST   /api/admin/spaces/:id/members     { user_ids } add people
+ *   DELETE /api/admin/spaces/:id/members/:u  soft remove (not the creator)
  *   GET    /api/admin/keys                   AI providers (key hints only), order
  *   PUT    /api/admin/keys/:provider         { key?, model? } save ("" clears)
  *   POST   /api/admin/keys/:provider/test    { key?, model? } free check
  *   GET    /api/admin/usage                  AI usage counted from the posts tab
  */
-import { adminLogin, createUser, deleteUser, getKeys, getUsage, listUsers, requireAdmin, resetUser, saveKey, testKey } from '../server/admin';
+import {
+  addSpaceMembers,
+  adminLogin,
+  createSpaceFor,
+  createUser,
+  deleteSpaceAsAdmin,
+  deleteUser,
+  getKeys,
+  getUsage,
+  listSpaces,
+  listUsers,
+  removeSpaceMember,
+  requireAdmin,
+  resetUser,
+  saveKey,
+  setCreator,
+  testKey,
+} from '../server/admin';
 import type { Result } from '../server/auth';
 import { adminDeps, readJson, respond } from '../server/http';
 import { adminPath, matchAdminRoute } from '../server/router';
@@ -35,6 +58,18 @@ async function dispatch(request: Request): Promise<Result> {
       return resetUser(deps, route.userId);
     case 'deleteUser':
       return deleteUser(deps, route.userId);
+    case 'setCreator':
+      return setCreator(deps, route.userId, await readJson(request));
+    case 'listSpaces':
+      return listSpaces(deps);
+    case 'createSpace':
+      return createSpaceFor(deps, await readJson(request));
+    case 'deleteSpace':
+      return deleteSpaceAsAdmin(deps, route.spaceId);
+    case 'addMembers':
+      return addSpaceMembers(deps, route.spaceId, await readJson(request));
+    case 'removeMember':
+      return removeSpaceMember(deps, route.spaceId, route.userId);
     case 'getKeys':
       return getKeys(deps);
     case 'saveKey':
