@@ -1,6 +1,7 @@
 /** Typed calls to /api/spaces. All return ApiResult (never throw). */
 import { api } from '@/lib/api';
 import type { PostView } from '@/lib/photo/upload';
+import type { Person } from '@/lib/spaces/people';
 
 export interface SpaceSummary {
   space_id: string;
@@ -18,9 +19,14 @@ export interface SpaceDetail extends SpaceSummary {
 const base = (id: string) => `/api/spaces/${encodeURIComponent(id)}`;
 
 export const spacesApi = {
-  list: (token: string) => api<{ spaces: SpaceSummary[] }>('/api/spaces', { token }),
-  create: (token: string, name: string) =>
-    api<{ space: SpaceSummary }>('/api/spaces', { method: 'POST', body: { name }, token }),
+  /** `can_create`: may this user create spaces (the admin decides). */
+  list: (token: string) => api<{ spaces: SpaceSummary[]; can_create?: boolean }>('/api/spaces', { token }),
+  create: (token: string, name: string, memberIds: string[] = []) =>
+    api<{ space: SpaceSummary }>('/api/spaces', { method: 'POST', body: { name, member_ids: memberIds }, token }),
+  /** People who can be added to a space (only for people who may create spaces or created one). */
+  people: (token: string) => api<{ people: Person[] }>('/api/spaces/people', { token }),
+  addMembers: (token: string, id: string, userIds: string[]) =>
+    api<{ space: SpaceDetail }>(`${base(id)}/members`, { method: 'POST', body: { user_ids: userIds }, token }),
   join: (token: string, code: string) =>
     api<{ space: { space_id: string; name: string } }>('/api/spaces/join', { method: 'POST', body: { code }, token }),
   get: (token: string, id: string) => api<{ space: SpaceDetail }>(base(id), { token }),

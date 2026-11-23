@@ -56,9 +56,10 @@ teacher's notes, and the AI uses them as its main source.
   ```
 
 **Study groups ("spaces")**
-- Create a space (6-letter join code + invite link) or join one; any member can send photos.
+- Only the people the admin allows can create a space. The creator ticks who to share it with and it
+  appears in their list straight away; a 6-letter join code + invite link also work. Any member can send photos.
 - **Live updates** to every open phone via Supabase Realtime Broadcast.
-- The creator can rename the space, remove members or delete it.
+- The creator can rename the space, add or remove members, or delete it.
 - Android **App Links**: invite links open the app directly.
 
 **Reference files**
@@ -73,8 +74,9 @@ teacher's notes, and the AI uses them as its main source.
 **Accounts and admin**
 - **Invite-only** accounts: the admin creates a user and hands over a one-time code
   (`XXXX-XXXX-XXXX`, 72 h, 5 tries).
-- Hidden **admin panel**: hold the "exengrupo" title for 3 s (or tap it 7 times). It has three tabs:
-  - **Usuarios:** create users, give new codes, delete users.
+- Hidden **admin panel**: hold the "exengrupo" title for 3 s (or tap it 7 times). It has four tabs:
+  - **Usuarios:** create users, give new codes, delete users, choose who may create spaces.
+  - **Espacios:** every space and its members; create spaces for users, add/remove members, delete.
   - **Claves IA:** add, test and remove AI keys and model IDs. Keys are stored encrypted.
   - **Uso:** AI usage (photos, errors, quota hits, answers per AI, OpenRouter credits).
 
@@ -238,6 +240,8 @@ All endpoints are under `/api`, JSON in and out, with errors as `{ "error": "<Sp
 | `GET` | `/auth/me` | Current user |
 | `GET` / `POST` | `/spaces` | My spaces / create a space |
 | `POST` | `/spaces/join` | Join with a code |
+| `GET` | `/spaces/people` | People who can be added (space creators only) |
+| `POST` | `/spaces/:id/members` | Add people (creator) |
 | `GET` / `PATCH` / `DELETE` | `/spaces/:id` | Details / rename / delete (creator) |
 | `DELETE` | `/spaces/:id/members/:userId` | Remove a member (creator) |
 | `GET` / `POST` | `/spaces/:id/posts` | Feed / send a photo (multipart `photo`) |
@@ -246,7 +250,7 @@ All endpoints are under `/api`, JSON in and out, with errors as `{ "error": "<Sp
 | `PUT` | `/spaces/:id/files/:fileId/chunks/:n` | Upload a ≤ 4 MB piece (`x-upload-token`) |
 | `POST` | `/spaces/:id/files/:fileId/process` | Run one processing step |
 | `DELETE` | `/spaces/:id/files/:fileId` | Delete a file (uploader or creator) |
-| `*` | `/admin/*` | Admin panel (admin token): users, AI keys, usage |
+| `*` | `/admin/*` | Admin panel (admin token): users, who may create spaces, spaces, AI keys, usage |
 | `GET` | `/cron/heartbeat` | Daily keep-alive (`CRON_SECRET`) |
 
 ---

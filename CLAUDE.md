@@ -46,13 +46,18 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Admin panel (/admin): opened by HOLDING the big "exengrupo" title for 3 s, or
   tapping it 7 times within 4 s (home and sign-in screens, app and web; a short
   vibration confirms on Android); its own password ADMIN_PASSWORD (Vercel).
-  Tabs: Usuarios, Claves IA, Uso (AI usage).
+  Tabs: Usuarios, Espacios, Claves IA, Uso (AI usage).
   Users: create (shows the code once), new code (also signs the person out on
-  every device), delete (can't sign in, leaves every space). Claves IA: add,
+  every device), delete (can't sign in, leaves every space), "Puede crear espacios"
+  switch. Espacios: every space with its members; create a space for any user
+  (choosing its creator and members), add/remove members (not the creator), delete. Claves IA: add,
   change, remove and test (free endpoints, no tokens) the AI keys and model IDs,
   including a Claude (Anthropic) slot.
 - Spaces: after login, a user creates a space (which gets a 6-letter join code +
-  link) or joins one with a code or link. Any member can send photos. Only the
+  link) or joins one with a code or link. ONLY people the admin allows may create
+  spaces (user decision 2026-11-23; by default only "numan"); the creator ticks who
+  to share it with and they are added at once (no code needed). Codes and links
+  still work too. The creator and the admin add/remove members afterwards. Any member can send photos. Only the
   creator can rename the space, remove members or delete it (soft delete: set
   deleted/removed = TRUE).
 - Live push: Supabase Realtime Broadcast only. No Supabase Auth, and no Supabase
@@ -399,6 +404,25 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   `… | ref: file p12; notes.docx` (never shown). Without files nothing changes.
 - Providers are `VisionClient`s (`call({prompt, mime, data})`, image or PDF) built by
   `buildClients()`; `answerProvider()` turns one into the old `Provider`.
+
+### Who creates spaces, adding people directly (added 2026-11-23, user request)
+
+- Permission: `ajustes` row `space_creators` = comma-separated user_ids
+  (`server/creators.ts`). Missing row = default, the user "numan"; empty = nobody.
+  The admin switch writes the full list. Settings are cached 30 s per server
+  instance, so a change can take up to 30 s to apply everywhere.
+- `GET /api/spaces` also returns `can_create`; home hides "Crear espacio" when false
+  (the server answers 403 anyway). `POST /api/spaces { name, member_ids }` adds the
+  ticked people at once. `GET /api/spaces/people` (allowed creators, or anyone who
+  created a space) lists every non-deleted account; `POST /api/spaces/:id/members
+  { user_ids }` (creator) adds people; a removed member's row is reused (removed=FALSE).
+- `insertSpace` / `addMembersTo` in `server/spaces.ts` are shared with the admin
+  handlers (`server/admin.ts`: `setCreator`, `listSpaces`, `createSpaceFor`,
+  `addSpaceMembers`, `removeSpaceMember`, `deleteSpaceAsAdmin`).
+- App: `PeoplePicker` (`src/features/spaces/`, tick rows via `ListRow checked`) in
+  crear, Miembros ("Añadir miembros") and admin → Espacios (`SpacesPanel`).
+  `DataDeps` now carries `settings`; `testDeps` lets every test user create spaces
+  unless a `creators` list is given.
 
 ### Which AI answered + AI usage (added 2026-11-22, user request)
 

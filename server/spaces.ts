@@ -1,8 +1,13 @@
-/** Spaces: create, join by code, list mine, details + members, and creator-only actions. */
+/**
+ * Spaces: create (only allowed users, server/creators.ts), join by code, list
+ * mine, details + members, and creator-only actions (rename, add/remove
+ * members, delete). The core of create/add is shared with the admin panel.
+ */
 import { normalizeSpaceName, spaceNameError } from '../src/lib/spaces/validation';
 import type { Result } from './auth';
 import { channelIdFromBytes, normalizeJoinCode, uniqueJoinCode } from './codes';
 import { authenticate, type DataDeps, fail, isResult, iso, membership, SPACE_MSG } from './context';
+import { canCreateSpaces, idList, isListedUser, people } from './creators';
 import { ROLE_CREATOR, ROLE_MEMBER, type SpaceRecord } from './schema';
 import { FALSE, isTrue, TRUE } from './table';
 
@@ -28,7 +33,11 @@ function nameFrom(body: unknown): string | null {
 export async function listMySpaces(deps: DataDeps, auth: string | null): Promise<Result> {
   const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
-  const [spaces, members] = await Promise.all([deps.spaces.list(), deps.members.list()]);
+  const [spaces, members, canCreate] = await Promise.all([
+    deps.spaces.list(),
+    deps.members.list(),
+    canCreateSpaces(deps, session.sub),
+  ]);
   const active = members.filter((m) => !isTrue(m.value.removed));
   const mine = new Set(active.filter((m) => m.value.user_id === session.sub).map((m) => m.value.space_id));
   const list: SpaceSummary[] = spaces
@@ -42,45 +51,116 @@ export async function listMySpaces(deps: DataDeps, auth: string | null): Promise
       is_creator: s.creator_id === session.sub,
       member_count: active.filter((m) => m.value.space_id === s.space_id).length,
     }));
-  return { status: 200, body: { spaces: list } };
+  return { status: 200, body: { spaces: list, can_create: canCreate } };
 }
 
-export async function createSpace(deps: DataDeps, auth: string | null, body: unknown): Promise<Result> {
-  const session = await authenticate(deps, auth);
-  if (isResult(session)) return session;
-  const raw = nameFrom(body);
-  if (raw === null) return fail(400, 'Datos no válidos.');
-  const invalid = spaceNameError(raw);
-  if (invalid) return fail(400, invalid);
+/** Checks that every id is an existing (not deleted) account. */
+async function validPeople(deps: DataDeps, ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const users = await deps.users.list();
+  const known = new Set(users.map((u) => u.value).filter(isListedUser).map((u) => u.user_id));
+  return ids.every((id) => known.has(id));
+}
 
+/**
+ * Adds people to a space as members: a removed member is put back, an active
+ * one is left as is. Returns how many were added. Ids must be validated first.
+ */
+export async function addMembersTo(deps: DataDeps, spaceId: string, userIds: string[]): Promise<number> {
+  const members = await deps.members.list();
+  const at = iso(deps);
+  let added = 0;
+  for (const userId of userIds) {
+    const rows = members.filter((m) => m.value.space_id === spaceId && m.value.user_id === userId);
+    if (rows.some((m) => !isTrue(m.value.removed))) continue;
+    if (rows.length > 0) await deps.members.update(rows[rows.length - 1].rowNumber, { removed: FALSE, joined_at: at });
+    else await deps.members.append({ space_id: spaceId, user_id: userId, role: ROLE_MEMBER, joined_at: at, removed: FALSE });
+    added++;
+  }
+  return added;
+}
+
+/** Creates a space for `creatorId` with these members (used by users and by the admin panel). */
+export async function insertSpace(
+  deps: DataDeps,
+  input: { name: string; creatorId: string; memberIds: string[] },
+): Promise<SpaceSummary> {
   const spaces = await deps.spaces.list();
   const taken = new Set(spaces.filter((s) => !isTrue(s.value.deleted)).map((s) => s.value.join_code));
   const at = iso(deps);
   const space: SpaceRecord = {
     space_id: deps.newId(),
-    name: normalizeSpaceName(raw),
+    name: normalizeSpaceName(input.name),
     join_code: uniqueJoinCode(taken, deps.randomIndex),
     channel_id: channelIdFromBytes(deps.randomBytes(24)),
-    creator_id: session.sub,
+    creator_id: input.creatorId,
     created_at: at,
     deleted: FALSE,
   };
   await deps.spaces.append(space);
   await deps.members.append({
     space_id: space.space_id,
-    user_id: session.sub,
+    user_id: input.creatorId,
     role: ROLE_CREATOR,
     joined_at: at,
     removed: FALSE,
   });
-  const summary: SpaceSummary = {
+  const others = input.memberIds.filter((id) => id !== input.creatorId);
+  const added = await addMembersTo(deps, space.space_id, others);
+  return {
     space_id: space.space_id,
     name: space.name,
     join_code: space.join_code,
     is_creator: true,
-    member_count: 1,
+    member_count: 1 + added,
   };
-  return { status: 201, body: { space: summary } };
+}
+
+/** Body: { name, member_ids?: string[] }. Only users the admin allowed (403 otherwise). */
+export async function createSpace(deps: DataDeps, auth: string | null, body: unknown): Promise<Result> {
+  const session = await authenticate(deps, auth);
+  if (isResult(session)) return session;
+  if (!(await canCreateSpaces(deps, session.sub))) return fail(403, SPACE_MSG.cannotCreate);
+  const raw = nameFrom(body);
+  const memberIds = idList(body, 'member_ids');
+  if (raw === null || memberIds === null) return fail(400, 'Datos no válidos.');
+  const invalid = spaceNameError(raw);
+  if (invalid) return fail(400, invalid);
+  if (!(await validPeople(deps, memberIds))) return fail(400, SPACE_MSG.badPeople);
+  const space = await insertSpace(deps, { name: raw, creatorId: session.sub, memberIds });
+  return { status: 201, body: { space } };
+}
+
+/**
+ * People the caller can add to a space (every account but their own). Only for
+ * users who may create spaces or who created one.
+ */
+export async function listPeople(deps: DataDeps, auth: string | null): Promise<Result> {
+  const session = await authenticate(deps, auth);
+  if (isResult(session)) return session;
+  const [users, spaces, allowed] = await Promise.all([
+    deps.users.list(),
+    deps.spaces.list(),
+    canCreateSpaces(deps, session.sub),
+  ]);
+  const createdOne = spaces.some((s) => s.value.creator_id === session.sub && !isTrue(s.value.deleted));
+  if (!allowed && !createdOne) return fail(403, SPACE_MSG.peopleDenied);
+  const list = people(users.map((u) => u.value)).filter((p) => p.user_id !== session.sub);
+  return { status: 200, body: { people: list } };
+}
+
+/** Body: { user_ids: string[] }. Creator only. Returns the updated details. */
+export async function addMembers(deps: DataDeps, auth: string | null, spaceId: string, body: unknown): Promise<Result> {
+  const session = await authenticate(deps, auth);
+  if (isResult(session)) return session;
+  const m = await membership(deps, spaceId, session.sub);
+  if (isResult(m)) return m;
+  if (!m.isCreator) return fail(403, SPACE_MSG.creatorOnly);
+  const ids = idList(body, 'user_ids');
+  if (ids === null || ids.length === 0) return fail(400, 'Datos no válidos.');
+  if (!(await validPeople(deps, ids))) return fail(400, SPACE_MSG.badPeople);
+  await addMembersTo(deps, spaceId, ids);
+  return getSpace(deps, auth, spaceId);
 }
 
 export async function joinSpace(deps: DataDeps, auth: string | null, body: unknown): Promise<Result> {

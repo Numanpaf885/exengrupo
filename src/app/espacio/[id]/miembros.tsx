@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Badge, initials } from '@/components/Badge';
@@ -13,7 +13,9 @@ import { Text } from '@/components/Text';
 import { TextField } from '@/components/TextField';
 import { useAuth } from '@/features/auth/AuthContext';
 import { type SpaceDetail, spacesApi } from '@/features/spaces/api';
-import { loadSpace } from '@/features/spaces/cache';
+import { cachedPeople, loadPeople, loadSpace } from '@/features/spaces/cache';
+import { PeoplePicker } from '@/features/spaces/PeoplePicker';
+import { pickedSummary } from '@/lib/spaces/people';
 import { memo } from '@/lib/memo';
 import { confirmAction } from '@/lib/confirm';
 import { SPACE_NAME_MAX, spaceNameError } from '@/lib/spaces/validation';
@@ -29,6 +31,10 @@ export default function Miembros() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [people, setPeople] = useState(() => cachedPeople() ?? null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const inSpace = useMemo(() => new Set(space?.members.map((m) => m.user_id) ?? []), [space]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -66,6 +72,33 @@ export default function Miembros() {
       () => spacesApi.rename(token, spaceId, name),
       () => {
         setSaved('Nombre guardado.');
+        void load();
+      },
+    );
+  };
+
+  const openAdd = () => {
+    setAdding(true);
+    setPicked(new Set());
+    if (!token) return;
+    void loadPeople(token).then((res) => {
+      if (res.ok) setPeople(res.data.people);
+      else {
+        setPeople((p) => p ?? []);
+        setError(res.error);
+      }
+    });
+  };
+
+  const addPicked = () => {
+    if (!token || picked.size === 0) return;
+    const count = picked.size;
+    void run(
+      () => spacesApi.addMembers(token, spaceId, [...picked]),
+      () => {
+        setAdding(false);
+        setPicked(new Set());
+        setSaved(count === 1 ? 'Persona añadida.' : `${count} personas añadidas.`);
         void load();
       },
     );
@@ -115,6 +148,40 @@ export default function Miembros() {
             </FadeIn>
           ))}
         </Section>
+      )}
+
+      {space?.is_creator && (
+        <View style={styles.block}>
+          <Text variant="title">Añadir miembros</Text>
+          {adding ? (
+            <>
+              <PeoplePicker
+                title="Elige a quién añadir"
+                people={people}
+                selected={picked}
+                onChange={setPicked}
+                exclude={inSpace}
+                footer="Lo verán en su lista al momento, sin código."
+              />
+              {picked.size > 0 && (
+                <Text tone="secondary">
+                  {pickedSummary(
+                    picked.size,
+                    (people ?? []).filter((p) => picked.has(p.user_id)).map((p) => p.username),
+                  )}
+                </Text>
+              )}
+              <Button
+                label={busy ? 'Añadiendo…' : 'Añadir'}
+                onPress={addPicked}
+                disabled={busy || picked.size === 0}
+              />
+              <Button label="Cancelar" kind="secondary" onPress={() => setAdding(false)} disabled={busy} />
+            </>
+          ) : (
+            <Button label="Añadir miembros" kind="secondary" onPress={openAdd} disabled={busy} />
+          )}
+        </View>
       )}
 
       {space?.is_creator && (

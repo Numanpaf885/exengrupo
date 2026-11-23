@@ -1,6 +1,7 @@
 /** Shared dependencies and helpers for the space and post handlers. */
 import { bearerToken, MSG, type Result, sessionUserValid } from './auth';
 import type { MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
+import type { SettingsStore } from './settings';
 import { type SessionPayload, verifySession } from './session';
 import { isTrue, type Table } from './table';
 
@@ -9,6 +10,8 @@ export interface DataDeps {
   spaces: Table<SpaceRecord>;
   members: Table<MemberRecord>;
   posts: Table<PostRecord>;
+  /** Sheet tab "ajustes" (AI keys, who may create spaces). */
+  settings: SettingsStore;
   secret: string;
   now: () => number;
   newId: () => string;
@@ -26,6 +29,10 @@ export const SPACE_MSG = {
   removed: 'Te quitaron de este espacio. Pide a quien lo creó que te vuelva a añadir.',
   cannotRemoveSelf: 'No puedes quitarte a ti mismo.',
   memberNotFound: 'Esa persona no es miembro del espacio.',
+  cannotCreate: 'Solo el administrador y las personas que él elija pueden crear espacios.',
+  badPeople: 'Alguna de las personas elegidas ya no existe. Recarga la lista.',
+  cannotRemoveCreator: 'No se puede quitar a quien creó el espacio.',
+  peopleDenied: 'Solo quien puede crear espacios ve la lista de personas.',
 } as const;
 
 /**

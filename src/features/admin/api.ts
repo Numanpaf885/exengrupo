@@ -15,6 +15,17 @@ export interface AdminUser {
   created_at: string;
   last_login: string;
   spaces: number;
+  /** May create spaces from the app. */
+  can_create: boolean;
+}
+
+export interface AdminSpace {
+  space_id: string;
+  name: string;
+  join_code: string;
+  creator_id: string;
+  created_at: string;
+  members: Array<{ user_id: string; username: string; is_creator: boolean }>;
 }
 
 export interface ProviderView {
@@ -69,6 +80,27 @@ export const adminApi = {
   create: (username: string) => api<CodeResult>('/api/admin/users', { method: 'POST', body: { username }, token: t() }),
   reset: (id: string) => api<CodeResult>(`/api/admin/users/${encodeURIComponent(id)}/reset`, { method: 'POST', token: t() }),
   remove: (id: string) => api<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE', token: t() }),
+  setCreator: (id: string, canCreate: boolean) =>
+    api<{ user_id: string; can_create: boolean }>(`/api/admin/users/${encodeURIComponent(id)}/creator`, {
+      method: 'PUT',
+      body: { can_create: canCreate },
+      token: t(),
+    }),
+  spaces: () => api<{ spaces: AdminSpace[] }>('/api/admin/spaces', { token: t() }),
+  createSpace: (body: { name: string; creator_id: string; member_ids: string[] }) =>
+    api<{ space: { space_id: string } }>('/api/admin/spaces', { method: 'POST', body, token: t() }),
+  deleteSpace: (id: string) => api<{ ok: true }>(`/api/admin/spaces/${encodeURIComponent(id)}`, { method: 'DELETE', token: t() }),
+  addMembers: (id: string, userIds: string[]) =>
+    api<{ ok: true }>(`/api/admin/spaces/${encodeURIComponent(id)}/members`, {
+      method: 'POST',
+      body: { user_ids: userIds },
+      token: t(),
+    }),
+  removeMember: (id: string, userId: string) =>
+    api<{ ok: true }>(`/api/admin/spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      token: t(),
+    }),
   keys: () => api<{ providers: ProviderView[]; order: string[] }>('/api/admin/keys', { token: t() }),
   saveKey: (id: string, body: { key?: string; model?: string }) =>
     api<{ providers: ProviderView[]; order: string[] }>(`/api/admin/keys/${id}`, { method: 'PUT', body, token: t() }),

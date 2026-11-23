@@ -7,6 +7,8 @@ export type SpacesRoute =
   | { name: 'list' }
   | { name: 'create' }
   | { name: 'join' }
+  | { name: 'people' }
+  | { name: 'addMembers'; spaceId: string }
   | { name: 'get'; spaceId: string }
   | { name: 'rename'; spaceId: string }
   | { name: 'delete'; spaceId: string }
@@ -37,6 +39,7 @@ export function matchSpacesRoute(method: string, seg: string[]): RouteMatch {
   const [a, b, c, d] = seg;
   if (seg.length === 0) return pick({ GET: { name: 'list' }, POST: { name: 'create' } });
   if (seg.length === 1 && a === 'join') return pick({ POST: { name: 'join' } });
+  if (seg.length === 1 && a === 'people') return pick({ GET: { name: 'people' } });
   if (seg.length === 1) {
     return pick({
       GET: { name: 'get', spaceId: a },
@@ -44,6 +47,7 @@ export function matchSpacesRoute(method: string, seg: string[]): RouteMatch {
       DELETE: { name: 'delete', spaceId: a },
     });
   }
+  if (seg.length === 2 && b === 'members') return pick({ POST: { name: 'addMembers', spaceId: a } });
   if (seg.length === 3 && b === 'members') return pick({ DELETE: { name: 'removeMember', spaceId: a, userId: c } });
   if (seg.length === 2 && b === 'posts') {
     return pick({ GET: { name: 'listPosts', spaceId: a }, POST: { name: 'createPost', spaceId: a } });
@@ -69,6 +73,12 @@ export type AdminRoute =
   | { name: 'createUser' }
   | { name: 'resetUser'; userId: string }
   | { name: 'deleteUser'; userId: string }
+  | { name: 'setCreator'; userId: string }
+  | { name: 'listSpaces' }
+  | { name: 'createSpace' }
+  | { name: 'deleteSpace'; spaceId: string }
+  | { name: 'addMembers'; spaceId: string }
+  | { name: 'removeMember'; spaceId: string; userId: string }
   | { name: 'getKeys' }
   | { name: 'saveKey'; provider: string }
   | { name: 'testKey'; provider: string }
@@ -82,11 +92,18 @@ export function adminPath(url: URL): string[] {
 export function matchAdminRoute(method: string, seg: string[]): AdminRoute | { name: 'notFound' } | { name: 'methodNotAllowed' } {
   const m = method.toUpperCase();
   const pick = (table: Record<string, AdminRoute>) => table[m] ?? ({ name: 'methodNotAllowed' } as const);
-  const [a, b, c] = seg;
+  const [a, b, c, d] = seg;
   if (seg.length === 1 && a === 'login') return pick({ POST: { name: 'login' } });
   if (seg.length === 1 && a === 'users') return pick({ GET: { name: 'listUsers' }, POST: { name: 'createUser' } });
   if (seg.length === 2 && a === 'users') return pick({ DELETE: { name: 'deleteUser', userId: b } });
   if (seg.length === 3 && a === 'users' && c === 'reset') return pick({ POST: { name: 'resetUser', userId: b } });
+  if (seg.length === 3 && a === 'users' && c === 'creator') return pick({ PUT: { name: 'setCreator', userId: b } });
+  if (seg.length === 1 && a === 'spaces') return pick({ GET: { name: 'listSpaces' }, POST: { name: 'createSpace' } });
+  if (seg.length === 2 && a === 'spaces') return pick({ DELETE: { name: 'deleteSpace', spaceId: b } });
+  if (seg.length === 3 && a === 'spaces' && c === 'members') return pick({ POST: { name: 'addMembers', spaceId: b } });
+  if (seg.length === 4 && a === 'spaces' && c === 'members') {
+    return pick({ DELETE: { name: 'removeMember', spaceId: b, userId: d } });
+  }
   if (seg.length === 1 && a === 'keys') return pick({ GET: { name: 'getKeys' } });
   if (seg.length === 1 && a === 'usage') return pick({ GET: { name: 'usage' } });
   if (seg.length === 2 && a === 'keys') return pick({ PUT: { name: 'saveKey', provider: b } });

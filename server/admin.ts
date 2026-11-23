@@ -3,7 +3,9 @@
  * token ("a1.…", separate from user tokens). The admin creates users and gets
  * a one-time code to hand over (shown once, stored only as a keyed hash),
  * gives a new code (which also signs that person out everywhere), deletes
- * users, and manages the AI keys/models (Sheet tab "ajustes", encrypted).
+ * users, chooses who may create spaces, manages every space (create for
+ * users, add/remove members, delete), and manages the AI keys/models (Sheet
+ * tab "ajustes", encrypted).
  */
 import { normalizeUsername, usernameError } from '../src/lib/auth/validation';
 import {
@@ -17,7 +19,10 @@ import {
 } from './accountState';
 import { bearerToken, type Result } from './auth';
 import type { DataDeps } from './context';
-import { fail } from './context';
+import { fail, SPACE_MSG } from './context';
+import { creatorIds, idList, isListedUser, setCanCreate } from './creators';
+import { spaceNameError } from '../src/lib/spaces/validation';
+import { addMembersTo, insertSpace } from './spaces';
 import {
   isProviderId,
   type KeyTest,
@@ -101,10 +106,15 @@ export interface AdminUserView {
   created_at: string;
   last_login: string;
   spaces: number;
+  can_create: boolean;
 }
 
 export async function listUsers(deps: AdminDeps): Promise<Result> {
-  const [users, members] = await Promise.all([deps.users.list(), deps.members.list()]);
+  const [users, members, settings] = await Promise.all([deps.users.list(), deps.members.list(), deps.settings.getAll()]);
+  const creators = creatorIds(
+    settings,
+    users.map((u) => u.value),
+  );
   const now = deps.now();
   const list: AdminUserView[] = [];
   for (const { value: u } of users) {
@@ -119,6 +129,7 @@ export async function listUsers(deps: AdminDeps): Promise<Result> {
       created_at: u.created_at,
       last_login: u.last_login,
       spaces: members.filter((m) => m.value.user_id === u.user_id && !isTrue(m.value.removed)).length,
+      can_create: creators.has(u.user_id),
     });
   }
   list.sort((a, b) => a.username.localeCompare(b.username));
@@ -179,6 +190,111 @@ export async function deleteUser(deps: AdminDeps, userId: string): Promise<Resul
   for (const m of members) {
     if (m.value.user_id === userId && !isTrue(m.value.removed)) await deps.members.update(m.rowNumber, { removed: TRUE });
   }
+  return { status: 200, body: { ok: true } };
+}
+
+/** Body: { can_create: boolean }. Who may create spaces from the app. */
+export async function setCreator(deps: AdminDeps, userId: string, body: unknown): Promise<Result> {
+  const allowed = body && typeof body === 'object' ? (body as Record<string, unknown>).can_create : null;
+  if (typeof allowed !== 'boolean') return fail(400, 'Datos no válidos.');
+  const users = await deps.users.list();
+  const row = users.find((u) => u.value.user_id === userId);
+  if (!row || !isListedUser(row.value)) return fail(404, ADMIN_MSG.notFound);
+  await setCanCreate(deps, userId, allowed);
+  return { status: 200, body: { user_id: userId, can_create: allowed } };
+}
+
+// ---- spaces --------------------------------------------------------------------
+
+export interface AdminSpaceView {
+  space_id: string;
+  name: string;
+  join_code: string;
+  creator_id: string;
+  created_at: string;
+  members: Array<{ user_id: string; username: string; is_creator: boolean }>;
+}
+
+/** Every active space with its active members, newest first. */
+export async function listSpaces(deps: AdminDeps): Promise<Result> {
+  const [spaces, members, users] = await Promise.all([deps.spaces.list(), deps.members.list(), deps.users.list()]);
+  const names = new Map(users.map((u) => [u.value.user_id, u.value.username]));
+  const list: AdminSpaceView[] = spaces
+    .map((r) => r.value)
+    .filter((s) => !isTrue(s.deleted))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map((s) => ({
+      space_id: s.space_id,
+      name: s.name,
+      join_code: s.join_code,
+      creator_id: s.creator_id,
+      created_at: s.created_at,
+      members: members
+        .map((m) => m.value)
+        .filter((m) => m.space_id === s.space_id && !isTrue(m.removed))
+        .sort((a, b) => a.joined_at.localeCompare(b.joined_at))
+        .map((m) => ({
+          user_id: m.user_id,
+          username: names.get(m.user_id) ?? '—',
+          is_creator: m.user_id === s.creator_id,
+        })),
+    }));
+  return { status: 200, body: { spaces: list } };
+}
+
+async function knownUsers(deps: AdminDeps, ids: string[]): Promise<boolean> {
+  const users = await deps.users.list();
+  const known = new Set(users.map((u) => u.value).filter(isListedUser).map((u) => u.user_id));
+  return ids.every((id) => known.has(id));
+}
+
+async function activeSpace(deps: AdminDeps, spaceId: string) {
+  const spaces = await deps.spaces.list();
+  return spaces.find((r) => r.value.space_id === spaceId && !isTrue(r.value.deleted)) ?? null;
+}
+
+/** Body: { name, creator_id, member_ids? }. The admin creates a space for a user. */
+export async function createSpaceFor(deps: AdminDeps, body: unknown): Promise<Result> {
+  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const memberIds = idList(body, 'member_ids');
+  if (typeof b.name !== 'string' || typeof b.creator_id !== 'string' || !b.creator_id || memberIds === null) {
+    return fail(400, 'Datos no válidos.');
+  }
+  const invalid = spaceNameError(b.name);
+  if (invalid) return fail(400, invalid);
+  if (!(await knownUsers(deps, [b.creator_id, ...memberIds]))) return fail(400, SPACE_MSG.badPeople);
+  const space = await insertSpace(deps, { name: b.name, creatorId: b.creator_id, memberIds });
+  return { status: 201, body: { space } };
+}
+
+/** Body: { user_ids }. */
+export async function addSpaceMembers(deps: AdminDeps, spaceId: string, body: unknown): Promise<Result> {
+  const ids = idList(body, 'user_ids');
+  if (ids === null || ids.length === 0) return fail(400, 'Datos no válidos.');
+  if (!(await activeSpace(deps, spaceId))) return fail(404, SPACE_MSG.notFound);
+  if (!(await knownUsers(deps, ids))) return fail(400, SPACE_MSG.badPeople);
+  await addMembersTo(deps, spaceId, ids);
+  return { status: 200, body: { ok: true } };
+}
+
+export async function removeSpaceMember(deps: AdminDeps, spaceId: string, userId: string): Promise<Result> {
+  const space = await activeSpace(deps, spaceId);
+  if (!space) return fail(404, SPACE_MSG.notFound);
+  if (space.value.creator_id === userId) return fail(400, SPACE_MSG.cannotRemoveCreator);
+  const members = await deps.members.list();
+  const target = members.find(
+    (r) => r.value.space_id === spaceId && r.value.user_id === userId && !isTrue(r.value.removed),
+  );
+  if (!target) return fail(404, SPACE_MSG.memberNotFound);
+  await deps.members.update(target.rowNumber, { removed: TRUE });
+  return { status: 200, body: { ok: true } };
+}
+
+/** Soft delete, like the creator's "Eliminar espacio". */
+export async function deleteSpaceAsAdmin(deps: AdminDeps, spaceId: string): Promise<Result> {
+  const space = await activeSpace(deps, spaceId);
+  if (!space) return fail(404, SPACE_MSG.notFound);
+  await deps.spaces.update(space.rowNumber, { deleted: TRUE });
   return { status: 200, body: { ok: true } };
 }
 
