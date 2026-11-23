@@ -1,11 +1,12 @@
 /**
  * Turns an uploaded reference file into page texts, one processing step at a
  * time (every step fits in one Vercel call):
- *  - .txt / .md: read as is; .docx: mammoth.
+ *  - .txt / .md: read as is; .html: tags stripped (html.ts); .docx: mammoth.
  *  - PDF with a text layer: unpdf, page by page.
  *  - Scanned PDF (≤ 30 pages) or image: OCR with the vision AI, 3 pages per step.
  */
 import type { PageText } from './chunk';
+import { decodeHtml, htmlToText } from './html';
 import { type FileKind, FILE_LIMITS, FILE_MSG } from './types';
 import type { ProviderResult, VisionClient, VisionInput } from '../ai/providers';
 import { quotaMessage } from '../ai/answers';
@@ -94,6 +95,9 @@ export async function extractStep(
 ): Promise<StepOutcome> {
   if (kind === 'text') {
     return { done: true, pages: 1, texts: [{ page: null, text: new TextDecoder('utf-8').decode(bytes) }] };
+  }
+  if (kind === 'html') {
+    return { done: true, pages: 1, texts: [{ page: null, text: htmlToText(decodeHtml(bytes)) }] };
   }
   if (kind === 'docx') {
     const mammoth = await import('mammoth');

@@ -48,7 +48,7 @@ Messages you may see: **No se lee bien, repite la foto** (retake it closer and i
 
 ## 5. Add the course book or notes (optional)
 
-In a space tap **Archivos** → **Añadir archivo** and choose a PDF, Word (.docx), text (.txt/.md) or image
+In a space tap **Archivos** → **Añadir archivo** and choose a PDF, Word (.docx), text (.txt), Markdown (.md), web page (.html) or image
 (up to 50 MB and 500 pages, 20 files per space). When it shows **Listo**, answers in that space follow
 your files first. Files are only read by the AI; nobody can open or download them in the app.
 

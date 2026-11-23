@@ -13,7 +13,7 @@ import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
 import { type FileView, filesApi } from '@/features/files/api';
 import { pickFile } from '@/features/files/pick';
-import { typeLabel } from '@/features/files/picked';
+import { ACCEPTED_EXT, BAD_TYPE, typeLabel } from '@/features/files/picked';
 import { dismissFileJob, startFileUpload, useFileJobs } from '@/features/files/uploads';
 import { confirmAction } from '@/lib/confirm';
 import { memo } from '@/lib/memo';
@@ -24,12 +24,12 @@ const MAX_BYTES = 50 * 1024 * 1024;
 const key = (id: string) => `files:${id}`;
 
 const pagesLabel = (n: number | null, type: string) =>
-  n === null || type === 'txt' || type === 'md' || type === 'docx' ? null : n === 1 ? '1 página' : `${n} páginas`;
+  n === null || type === 'txt' || type === 'md' || type === 'html' || type === 'docx' ? null : n === 1 ? '1 página' : `${n} páginas`;
 
 const statusChip = (s: string) =>
   s === 'listo' ? <Chip label="Listo" tone="success" /> : s === 'error' ? <Chip label="Error" tone="danger" /> : <Chip label="Procesando" tone="neutral" />;
 
-const badgeText = (type: string) => (type === 'jpg' || type === 'png' ? 'IMG' : type === 'docx' ? 'DOC' : type.toUpperCase());
+const badgeText = (type: string) => (type === 'jpg' || type === 'png' ? 'IMG' : type === 'docx' ? 'DOC' : type === 'html' ? 'WEB' : type.toUpperCase());
 
 function FileRow({ file, onDelete, busy }: { file: FileView; onDelete: () => void; busy: boolean }) {
   const meta = [typeLabel(file.type), pagesLabel(file.pages, file.type), `subido por ${file.uploader}`].filter(Boolean).join(' · ');
@@ -107,6 +107,7 @@ export default function Archivos() {
       return setError('No se pudo abrir el archivo. Prueba de nuevo.');
     }
     if (!picked) return;
+    if (!ACCEPTED_EXT.test(picked.name)) return setError(BAD_TYPE);
     if (picked.size > MAX_BYTES) return setError('El archivo pesa demasiado (máximo 50 MB).');
     startFileUpload(spaceId, picked, token);
   };
@@ -182,7 +183,7 @@ export default function Archivos() {
           <Card>
             <Text variant="headline">Aún no hay archivos</Text>
             <Text tone="secondary">
-              Añade el libro del curso o los apuntes del profesor (PDF, Word, texto o imagen, hasta 50 MB y 500 páginas) para que
+              Añade el libro del curso o los apuntes del profesor (PDF, Word, texto, Markdown, HTML o imagen, hasta 50 MB y 500 páginas) para que
               las respuestas sigan vuestro temario.
             </Text>
           </Card>

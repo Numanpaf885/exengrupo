@@ -15,7 +15,7 @@ export const FILE_LIMITS = {
   maxChunks: Math.ceil((50 * 1024 * 1024) / 4_000_000),
 } as const;
 
-export type FileKind = 'pdf' | 'image' | 'text' | 'docx';
+export type FileKind = 'pdf' | 'image' | 'text' | 'docx' | 'html';
 
 const TYPES: Record<string, { kind: FileKind; mime: string }> = {
   pdf: { kind: 'pdf', mime: 'application/pdf' },
@@ -24,18 +24,24 @@ const TYPES: Record<string, { kind: FileKind; mime: string }> = {
   png: { kind: 'image', mime: 'image/png' },
   txt: { kind: 'text', mime: 'text/plain' },
   md: { kind: 'text', mime: 'text/markdown' },
+  markdown: { kind: 'text', mime: 'text/markdown' },
+  html: { kind: 'html', mime: 'text/html' },
+  htm: { kind: 'html', mime: 'text/html' },
   docx: { kind: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
 };
 
-/** The file's extension when it's an accepted type ("jpeg" is stored as "jpg"), else null. */
+/** Extensions stored under another name: "jpeg" → "jpg", "htm" → "html", "markdown" → "md". */
+const SAME_AS: Record<string, string> = { jpeg: 'jpg', htm: 'html', markdown: 'md' };
+
+/** The file's extension when it's an accepted type, else null. */
 export function fileType(name: string): { ext: string; kind: FileKind; mime: string } | null {
   const ext = /\.([a-z0-9]+)$/i.exec(name.trim())?.[1]?.toLowerCase();
   if (!ext || !TYPES[ext]) return null;
-  return { ext: ext === 'jpeg' ? 'jpg' : ext, ...TYPES[ext] };
+  return { ext: SAME_AS[ext] ?? ext, ...TYPES[ext] };
 }
 
 export const FILE_MSG = {
-  badType: 'Tipo de archivo no admitido. Usa PDF, JPG, PNG, TXT, MD o DOCX.',
+  badType: 'Tipo de archivo no admitido. Usa PDF, JPG, PNG, TXT, MD, HTML o DOCX.',
   tooBig: 'El archivo pesa demasiado (máximo 50 MB).',
   empty: 'El archivo está vacío.',
   tooMany: 'Este espacio ya tiene 20 archivos. Borra alguno para añadir otro.',

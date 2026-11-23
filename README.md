@@ -63,7 +63,7 @@ teacher's notes, and the AI uses them as its main source.
 - Android **App Links**: invite links open the app directly.
 
 **Reference files**
-- Add the course book or notes to a space: **PDF, DOCX, TXT/MD, JPG/PNG** (up to 50 MB, 500 pages,
+- Add the course book or notes to a space: **PDF, DOCX, TXT, Markdown (.md), HTML, JPG/PNG** (up to 50 MB, 500 pages,
   20 files per space).
 - Text PDFs are read directly; scanned PDFs (≤ 30 pages) and images are OCR'd by the vision AI.
 - When answering, the app transcribes the questions, searches the space's files (accent-insensitive
