@@ -400,7 +400,6 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   `… | ref: file p12; notes.docx` (never shown). Without files nothing changes.
 - Providers are `VisionClient`s (`call({prompt, mime, data})`, image or PDF) built by
   `buildClients()`; `answerProvider()` turns one into the old `Provider`.
-
 - Android's document picker filters by MIME type and many phones report .md
   as a generic file, so the picker also allows `text/*` and
   `application/octet-stream`; the app checks the extension (`ACCEPTED_EXT` in
