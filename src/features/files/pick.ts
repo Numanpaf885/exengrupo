@@ -1,5 +1,5 @@
 /**
- * Android: pick a reference file from documents (PDF, images, .txt, .md, .docx)
+ * Android: pick a reference file from documents (PDF, images, .txt, .md, .html, .docx)
  * or from the gallery. Images are shrunk on the phone first (≤ 2000 px JPEG),
  * which is plenty for the AI to read them.
  */
@@ -42,7 +42,7 @@ async function fromGallery(): Promise<PickedFile | null> {
 export function pickFile(): Promise<PickedFile | null> {
   return new Promise((resolve, reject) => {
     const run = (f: () => Promise<PickedFile | null>) => () => void f().then(resolve, reject);
-    Alert.alert('Añadir archivo', 'PDF, Word (.docx), texto (.txt, .md) o imagen.', [
+    Alert.alert('Añadir archivo', 'PDF, Word (.docx), texto (.txt, .md), página web (.html) o imagen.', [
       { text: 'Documento', onPress: run(fromDocuments) },
       { text: 'Galería', onPress: run(fromGallery) },
       { text: 'Cancelar', style: 'cancel', onPress: () => resolve(null) },

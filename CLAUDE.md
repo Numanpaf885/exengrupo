@@ -371,7 +371,7 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 
 ### Reference files (added 2026-11-22, user request)
 
-- Members add PDF / JPG / PNG / .txt / .md / .docx to a space (screen
+- Members add PDF / JPG / PNG / .txt / .md / .html / .docx to a space (screen
   `espacio/[id]/archivos`). Limits: 50 MB, 500 pages, 20 files per space. Any member
   adds; uploader or creator deletes (soft delete + R2 objects removed). AI-only: the
   app never offers to open or download them.
@@ -387,7 +387,8 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   file and deletes them. No R2 CORS rule is needed. Images are shrunk on the
   phone to a ≤ 2000 px JPEG before upload.
 - Processing (`server/files/extract.ts`, one step per call so each fits in 60 s):
-  .txt/.md as is; .docx with mammoth; PDF text layer with unpdf; scanned PDF (>50 %
+  .txt/.md as is; .html/.htm → text by `html.ts` (no dependency: drops script/style/nav,
+  keeps blocks, lists and table cells, decodes entities, honours meta charset); .docx with mammoth; PDF text layer with unpdf; scanned PDF (>50 %
   pages without text, ≤ 30 pages) or image → OCR by the vision AI (PDFs only Claude or
   Gemini, 3 pages per step via pdf-lib). Text → ~1,000-char chunks with page numbers
   (`chunk.ts`) → JSON at text_key. Every failure ends as "error"; a "procesando" row
@@ -399,6 +400,11 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   `… | ref: file p12; notes.docx` (never shown). Without files nothing changes.
 - Providers are `VisionClient`s (`call({prompt, mime, data})`, image or PDF) built by
   `buildClients()`; `answerProvider()` turns one into the old `Provider`.
+
+- Android's document picker filters by MIME type and many phones report .md
+  as a generic file, so the picker also allows `text/*` and
+  `application/octet-stream`; the app checks the extension (`ACCEPTED_EXT` in
+  `src/features/files/picked.ts`) before uploading and the server checks it again.
 
 ### Which AI answered + AI usage (added 2026-11-22, user request)
 
