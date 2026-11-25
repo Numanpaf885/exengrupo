@@ -176,6 +176,23 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   changing the Sheet schema, adding a service or paid plan not listed here, or
   doing anything that needs an account action from the user.
 
+## How Claude works here (planner + crew, added 2026-11-25, user request)
+
+- You are the planner. Start every job by writing one clear goal and how we
+  will know it is done.
+- Split the job into small tasks. Hand each task to the `worker` agent
+  (`.claude/agents/worker.md`, Haiku).
+- Send every result to the `checker` agent (`.claude/agents/checker.md`, Haiku).
+  If it fails, send it back to the worker with the reason, up to three times.
+- You do the thinking and the final review; the workers do the work.
+- When the user corrects how a skill works, update that skill's SKILL.md in
+  `.claude/skills` so the mistake does not happen again, and tell the user what
+  you changed.
+- `.claude/settings.json`: Opus at effort xhigh, auto-compact at 40 %
+  (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; 60 for long jobs), and the ponytail plugin
+  (github.com/DietrichGebert/ponytail: smallest change that works).
+- Undo: delete `.claude/` and this section.
+
 ## Done, for every slice
 
 - `npx tsc --noEmit` passes, the tests pass and `npx expo export -p web`
