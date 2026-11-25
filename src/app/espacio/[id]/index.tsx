@@ -1,6 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Share, StyleSheet, View } from 'react-native';
+import { BackHandler, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { RoundUploadButton } from '@/components/RoundButton';
 import { FadeIn } from '@/components/FadeIn';
@@ -22,6 +23,8 @@ import { parseAnswerLine } from '@/lib/answerLines';
 import { realtimeConfigured, WEB_URL } from '@/lib/config';
 import type { PostView } from '@/lib/photo/upload';
 import { subscribeToSpace } from '@/lib/realtime';
+import { enterFullscreen, exitFullscreen, onFullscreenExit } from '@/lib/fullscreen';
+import { memo } from '@/lib/memo';
 import { formatPostTime } from '@/lib/time';
 import { space as grid } from '@/theme/tokens';
 
@@ -56,6 +59,30 @@ function AnswerList({ answer, labels }: { answer: string; labels: Record<string,
         </View>
       ))}
     </View>
+  );
+}
+
+/** Full screen mode: only the answers (and a small time line to tell photos apart). */
+function FocusPostItem({ post }: { post: PostView }) {
+  return (
+    <Card>
+      <Text variant="caption" tone="secondary">
+        {formatPostTime(post.created_at)}
+      </Text>
+      {post.status === 'processing' ? (
+        <LoadingBar label="Analizando…" />
+      ) : (
+        <FadeIn key={post.status} offset={8}>
+          {post.status === 'error' ? (
+            <Text variant="headline" tone="accent">
+              {post.answer || 'No se pudo analizar la foto. Prueba de nuevo.'}
+            </Text>
+          ) : (
+            <AnswerList answer={post.answer} labels={post.labels ?? {}} />
+          )}
+        </FadeIn>
+      )}
+    </Card>
   );
 }
 
@@ -102,6 +129,32 @@ export default function Espacio() {
   const [notFound, setNotFound] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const uploads = useUploads(spaceId);
+  // Full screen mode: only the answers and the photo buttons. Remembered while the app is open.
+  const focusKey = `focus:${spaceId}`;
+  const [focus, setFocusState] = useState(() => memo.get<boolean>(focusKey) === true);
+  const setFocus = useCallback(
+    (on: boolean) => {
+      memo.set(focusKey, on);
+      setFocusState(on);
+      if (on) enterFullscreen();
+      else exitFullscreen();
+    },
+    [focusKey],
+  );
+
+  // Android back button (only while this screen is on top, not under the camera)
+  // and the browser leaving full screen by itself: back to the normal view.
+  useFocusEffect(
+    useCallback(() => {
+      if (!focus) return;
+      const back = BackHandler.addEventListener('hardwareBackPress', () => {
+        setFocus(false);
+        return true;
+      });
+      return () => back.remove();
+    }, [focus, setFocus]),
+  );
+  useEffect(() => (focus ? onFullscreenExit(() => setFocus(false)) : undefined), [focus, setFocus]);
 
   /** Send an existing photo (gallery / files) for answers, like one taken with the camera. */
   const uploadPhoto = async () => {
@@ -204,6 +257,67 @@ export default function Espacio() {
 
   const empty = posts?.length === 0 && uploads.list.length === 0;
 
+  const photoButtons = (
+    <>
+      <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} flex large />
+      <RoundUploadButton label="Subir foto" onPress={() => void uploadPhoto()} disabled={!space} />
+    </>
+  );
+
+  const uploadCards = uploads.list.map((u) => (
+    <FadeIn key={u.id}>
+      <Card>
+        <View style={styles.meta}>
+          <Badge text="Tú" round />
+          <View style={styles.grow}>
+            <Text variant="label">Tu foto</Text>
+            <Text variant="caption" tone="secondary">
+              {u.state === 'error' ? 'No se envió' : u.state === 'preparing' ? 'Preparando…' : 'Enviando y analizando…'}
+            </Text>
+          </View>
+        </View>
+        {u.state === 'error' ? (
+          <>
+            <Notice text={u.error} />
+            <Button label="Descartar" kind="secondary" onPress={() => dismissUpload(u.id)} />
+          </>
+        ) : (
+          <LoadingBar label="Enviando y analizando…" />
+        )}
+      </Card>
+    </FadeIn>
+  ));
+
+  if (focus) {
+    return (
+      <Screen onRefresh={() => void refresh()} refreshing={refreshing} footer={photoButtons}>
+        <StatusBar style="light" hidden />
+        {/* The only other control: a quiet way out (Android's back button works too). */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Salir de pantalla completa"
+          onPress={() => setFocus(false)}
+          hitSlop={12}
+          style={({ pressed }) => [styles.exit, pressed && { opacity: 0.4 }]}
+        >
+          <Text variant="caption" tone="secondary">
+            Salir
+          </Text>
+        </Pressable>
+        <View style={styles.feed}>
+          {uploadCards}
+          {posts?.map((p, i) => (
+            <FadeIn key={p.post_id} index={i}>
+              <FocusPostItem post={p} />
+            </FadeIn>
+          ))}
+        </View>
+        {posts === null && !error && <LoadingBar label="Cargando…" />}
+        {empty && <Text tone="secondary">Aún no hay respuestas.</Text>}
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       onBack={back}
@@ -221,12 +335,7 @@ export default function Espacio() {
           </>
         )
       }
-      footer={
-        <>
-          <Button label="Tomar foto" onPress={() => router.push(`/espacio/${spaceId}/camara`)} disabled={!space} flex large />
-          <RoundUploadButton label="Subir foto" onPress={() => void uploadPhoto()} disabled={!space} />
-        </>
-      }
+      footer={photoButtons}
     >
       <View style={styles.titleBlock}>
         <Text variant="display" numberOfLines={3}>
@@ -238,6 +347,7 @@ export default function Espacio() {
               Código {space.join_code}
             </Text>
             <Button kind="secondary" small label="Invitar" onPress={share} />
+            <Button kind="secondary" small label="Pantalla completa" onPress={() => setFocus(true)} />
           </View>
         )}
       </View>
@@ -246,29 +356,7 @@ export default function Espacio() {
       {error && <Button label="Reintentar" kind="secondary" onPress={() => void load()} />}
 
       <View style={styles.feed}>
-        {uploads.list.map((u) => (
-          <FadeIn key={u.id}>
-            <Card>
-              <View style={styles.meta}>
-                <Badge text="Tú" round />
-                <View style={styles.grow}>
-                  <Text variant="label">Tu foto</Text>
-                  <Text variant="caption" tone="secondary">
-                    {u.state === 'error' ? 'No se envió' : u.state === 'preparing' ? 'Preparando…' : 'Enviando y analizando…'}
-                  </Text>
-                </View>
-              </View>
-              {u.state === 'error' ? (
-                <>
-                  <Notice text={u.error} />
-                  <Button label="Descartar" kind="secondary" onPress={() => dismissUpload(u.id)} />
-                </>
-              ) : (
-                <LoadingBar label="Enviando y analizando…" />
-              )}
-            </Card>
-          </FadeIn>
-        ))}
+        {uploadCards}
         {posts?.map((p, i) => (
           <FadeIn key={p.post_id} index={i}>
             <PostItem post={p} />
@@ -300,7 +388,8 @@ const keepSpaces = Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap' } as object
 
 const styles = StyleSheet.create({
   titleBlock: { gap: grid(1) },
-  codeRow: { flexDirection: 'row', alignItems: 'center', gap: grid(1.5) },
+  codeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: grid(1.5) },
+  exit: { alignSelf: 'flex-end', paddingVertical: grid(0.5) },
   feed: { gap: grid(1.5) },
   meta: { flexDirection: 'row', alignItems: 'center', gap: grid(1.5) },
   answers: { gap: grid(1) },

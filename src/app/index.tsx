@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { FadeIn } from '@/components/FadeIn';
 import { Badge, initials } from '@/components/Badge';
@@ -15,7 +15,9 @@ import { useAuth } from '@/features/auth/AuthContext';
 import type { SpaceSummary } from '@/features/spaces/api';
 import { cachedCanCreate, cachedSpaces, loadSpaces, prefetchSpace } from '@/features/spaces/cache';
 import { UpdateBanner } from '@/features/update/UpdateBanner';
+import { confirmAction } from '@/lib/confirm';
 import { takePendingJoin } from '@/lib/pendingJoin';
+import { space } from '@/theme/tokens';
 
 const members = (n: number) => (n === 1 ? '1 miembro' : `${n} miembros`);
 
@@ -27,6 +29,12 @@ export default function Home() {
   const [canCreate, setCanCreate] = useState(cachedCanCreate);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showMore, setShowMore] = useState(false);
+
+  const signOut = async () => {
+    const ok = await confirmAction('Cerrar sesión', '¿Cerrar sesión en este dispositivo?', 'Cerrar sesión');
+    if (ok) await logout();
+  };
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -112,14 +120,24 @@ export default function Home() {
       )}
       {error && <Button label="Reintentar" kind="secondary" onPress={() => void load()} />}
 
-      <Section>
-        <ListRow label="Prueba de lente" onPress={() => router.push('/lente')}>
-          <Text>Prueba de lente</Text>
-        </ListRow>
-        <ListRow label="Cerrar sesión" onPress={() => void logout()}>
-          <Text tone="accent">Cerrar sesión</Text>
-        </ListRow>
-      </Section>
+      {/* Lens test and sign out stay out of sight until "Más" is tapped. */}
+      <View style={styles.more}>
+        <Button kind="ghost" label={showMore ? 'Menos' : 'Más'} onPress={() => setShowMore((v) => !v)} />
+      </View>
+      {showMore && (
+        <FadeIn>
+          <Section>
+            <ListRow label="Prueba de lente" onPress={() => router.push('/lente')}>
+              <Text>Prueba de lente</Text>
+            </ListRow>
+            <ListRow label="Cerrar sesión" onPress={() => void signOut()}>
+              <Text tone="accent">Cerrar sesión</Text>
+            </ListRow>
+          </Section>
+        </FadeIn>
+      )}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({ more: { alignItems: 'center', marginTop: 'auto', paddingTop: space(1) } });

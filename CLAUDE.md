@@ -363,6 +363,19 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - Speed: `src/lib/memo.ts` in-memory stale-while-revalidate cache (cleared on
   logout) + `src/features/spaces/cache.ts`; touching a space row prefetches it.
 
+### Home extras and full screen mode (added 2026-11-25, user request)
+
+- Home: "Prueba de lente" and "Cerrar sesión" are hidden behind a ghost "Más"
+  button at the end of the list; "Cerrar sesión" asks for confirmation first.
+- Space "Pantalla completa" (button next to "Invitar"): only the answers (a time
+  line + `AnswerList`, no names) and the footer's "Tomar foto" / "Subir foto"; no
+  back link, header links, title, code or "Actualizar". A quiet "Salir" text at the
+  top right leaves it; Android's back button and the browser leaving full screen
+  do too. Android hides the status bar (expo-status-bar `hidden`); web uses the
+  Fullscreen API where it exists (`src/lib/fullscreen(.web).ts`; iPhone Safari has
+  none, the home-screen app is already full screen). Remembered per space in `memo`
+  while the app is open, so it survives going to the camera and back.
+
 ### Desktop layout (added 2026-11-22, user request)
 
 - Only web windows ≥ 900 px wide (`useDesktop()` in `src/lib/useDesktop.ts`) get it;
