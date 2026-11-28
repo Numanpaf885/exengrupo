@@ -83,7 +83,7 @@ describe('listing and details', () => {
     await createSpace(d, bearer('eva'), { name: 'Otro' });
     const mine = (await listMySpaces(d, bearer('luis'))).body as { spaces: SpaceSummary[] };
     expect(mine.spaces).toEqual([
-      { space_id: space.space_id, name: 'Física 2º', join_code: space.join_code, is_creator: false, member_count: 2 },
+      { space_id: space.space_id, name: 'Física 2º', join_code: space.join_code, is_creator: false, member_count: 2, archived: false },
     ]);
   });
 

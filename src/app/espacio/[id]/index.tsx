@@ -12,14 +12,13 @@ import { Screen } from '@/components/Screen';
 import { Card } from '@/components/Section';
 import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
+import { AnswerList } from '@/features/spaces/AnswerList';
 import { type SpaceDetail, type SpaceSummary, spacesApi } from '@/features/spaces/api';
 import { cachedPosts, cachedSpace, loadPosts, loadSpace, rememberPosts } from '@/features/spaces/cache';
 import { upsertPost } from '@/features/spaces/feed';
 import { pickPhoto } from '@/features/camera/pickPhoto';
 import { dismissUpload, startUpload, useUploads } from '@/features/spaces/uploads';
-import { displayAnswer } from '@/lib/answerDisplay';
 import { compressPhoto } from '@/lib/photo/compress';
-import { parseAnswerLine } from '@/lib/answerLines';
 import { realtimeConfigured, WEB_URL } from '@/lib/config';
 import type { PostView } from '@/lib/photo/upload';
 import { subscribeToSpace } from '@/lib/realtime';
@@ -27,40 +26,6 @@ import { enterFullscreen, exitFullscreen, onFullscreenExit } from '@/lib/fullscr
 import { memo } from '@/lib/memo';
 import { formatPostTime } from '@/lib/time';
 import { space as grid } from '@/theme/tokens';
-
-/**
- * One answer per line ("1. a", "2. b", "3. b/c ?", "4. El corazón."), each with
- * the AI that gave it on the right. Anything that isn't an answer line is shown as is.
- */
-function AnswerList({ answer, labels }: { answer: string; labels: Record<string, string> }) {
-  const items = parseAnswerLine(answer);
-  if (!items) {
-    return (
-      <Text variant="answer" selectable style={keepSpaces}>
-        {displayAnswer(answer)}
-      </Text>
-    );
-  }
-  return (
-    <View style={styles.answers}>
-      {items.map((item) => (
-        <View key={item.n} style={styles.answerRow}>
-          <Text variant="title" tone="secondary" style={styles.answerNumber}>
-            {`${item.n}.`}
-          </Text>
-          <Text variant="title" tone={item.unsure ? 'accent' : 'primary'} selectable style={styles.answerText}>
-            {displayAnswer(item.unsure ? `${item.text} ?` : item.text)}
-          </Text>
-          {labels[item.n] ? (
-            <Text variant="caption" tone="secondary" style={styles.answerSource}>
-              {labels[item.n]}
-            </Text>
-          ) : null}
-        </View>
-      ))}
-    </View>
-  );
-}
 
 /** Full screen mode: only the answers (and a small time line to tell photos apart). */
 function FocusPostItem({ post }: { post: PostView }) {
@@ -326,6 +291,7 @@ export default function Espacio() {
       headerRight={
         space && (
           <>
+            <Button kind="ghost" label="Fotos" onPress={() => router.push(`/espacio/${spaceId}/fotos`)} />
             <Button kind="ghost" label="Archivos" onPress={() => router.push(`/espacio/${spaceId}/archivos`)} />
             <Button
               kind="ghost"
@@ -349,6 +315,11 @@ export default function Espacio() {
             <Button kind="secondary" small label="Invitar" onPress={share} />
             <Button kind="secondary" small label="Pantalla completa" onPress={() => setFocus(true)} />
           </View>
+        )}
+        {space?.archived && (
+          <Text variant="caption" tone="secondary">
+            Archivado: los miembros no lo ven. Recupéralo en Miembros.
+          </Text>
         )}
       </View>
 
@@ -383,20 +354,12 @@ export default function Espacio() {
   );
 }
 
-// Browsers collapse the double spaces between answers unless told not to.
-const keepSpaces = Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap' } as object) : undefined;
-
 const styles = StyleSheet.create({
   titleBlock: { gap: grid(1) },
   codeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: grid(1.5) },
   exit: { alignSelf: 'flex-end', paddingVertical: grid(0.5) },
   feed: { gap: grid(1.5) },
   meta: { flexDirection: 'row', alignItems: 'center', gap: grid(1.5) },
-  answers: { gap: grid(1) },
-  answerRow: { flexDirection: 'row', alignItems: 'baseline', gap: grid(1) },
-  answerNumber: { minWidth: 36 },
-  answerText: { flex: 1 },
-  answerSource: { maxWidth: '45%', textAlign: 'right' },
   grow: { flex: 1 },
   more: { marginTop: 'auto', alignItems: 'center' },
 });

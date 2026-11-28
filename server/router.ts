@@ -9,6 +9,9 @@ export type SpacesRoute =
   | { name: 'join' }
   | { name: 'people' }
   | { name: 'addMembers'; spaceId: string }
+  | { name: 'archive'; spaceId: string }
+  | { name: 'listPhotos'; spaceId: string }
+  | { name: 'getPhoto'; spaceId: string; postId: string }
   | { name: 'get'; spaceId: string }
   | { name: 'rename'; spaceId: string }
   | { name: 'delete'; spaceId: string }
@@ -48,6 +51,9 @@ export function matchSpacesRoute(method: string, seg: string[]): RouteMatch {
     });
   }
   if (seg.length === 2 && b === 'members') return pick({ POST: { name: 'addMembers', spaceId: a } });
+  if (seg.length === 2 && b === 'archive') return pick({ POST: { name: 'archive', spaceId: a } });
+  if (seg.length === 2 && b === 'photos') return pick({ GET: { name: 'listPhotos', spaceId: a } });
+  if (seg.length === 3 && b === 'photos') return pick({ GET: { name: 'getPhoto', spaceId: a, postId: c } });
   if (seg.length === 3 && b === 'members') return pick({ DELETE: { name: 'removeMember', spaceId: a, userId: c } });
   if (seg.length === 2 && b === 'posts') {
     return pick({ GET: { name: 'listPosts', spaceId: a }, POST: { name: 'createPost', spaceId: a } });
@@ -77,6 +83,7 @@ export type AdminRoute =
   | { name: 'listSpaces' }
   | { name: 'createSpace' }
   | { name: 'deleteSpace'; spaceId: string }
+  | { name: 'archiveSpace'; spaceId: string }
   | { name: 'addMembers'; spaceId: string }
   | { name: 'removeMember'; spaceId: string; userId: string }
   | { name: 'getKeys' }
@@ -101,6 +108,7 @@ export function matchAdminRoute(method: string, seg: string[]): AdminRoute | { n
   if (seg.length === 1 && a === 'spaces') return pick({ GET: { name: 'listSpaces' }, POST: { name: 'createSpace' } });
   if (seg.length === 2 && a === 'spaces') return pick({ DELETE: { name: 'deleteSpace', spaceId: b } });
   if (seg.length === 3 && a === 'spaces' && c === 'members') return pick({ POST: { name: 'addMembers', spaceId: b } });
+  if (seg.length === 3 && a === 'spaces' && c === 'archive') return pick({ PUT: { name: 'archiveSpace', spaceId: b } });
   if (seg.length === 4 && a === 'spaces' && c === 'members') {
     return pick({ DELETE: { name: 'removeMember', spaceId: b, userId: d } });
   }

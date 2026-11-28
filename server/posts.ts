@@ -41,7 +41,7 @@ export interface PostView {
   created_at: string;
 }
 
-function toView(p: PostRecord, names: Map<string, string>): PostView {
+export function toView(p: PostRecord, names: Map<string, string>): PostView {
   return {
     post_id: p.post_id,
     user_id: p.user_id,

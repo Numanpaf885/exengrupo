@@ -8,6 +8,7 @@ import type { AuthDeps, Result } from './auth';
 import type { DataDeps } from './context';
 import type { FileDeps } from './files/handlers';
 import { analyzeWithReferences, loadSpaceChunks } from './files/refs';
+import type { PhotoDeps } from './photos';
 import type { PostDeps } from './posts';
 import { supabaseBroadcaster } from './realtime';
 import type { FileRecord, MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
@@ -104,6 +105,10 @@ export function fileDeps(): FileDeps {
     clients: () => visionClients(data.secret),
     log: (message) => console.error(message),
   };
+}
+
+export function photoDeps(): PhotoDeps {
+  return { ...dataDeps(), storage: storage() };
 }
 
 export function postDeps(): PostDeps {

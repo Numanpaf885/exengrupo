@@ -110,6 +110,26 @@ export default function Miembros() {
     if (ok) void run(() => spacesApi.removeMember(token, spaceId, userId), () => void load());
   };
 
+  const toggleArchive = async () => {
+    if (!token || !space) return;
+    const archive = !space.archived;
+    const ok = archive
+      ? await confirmAction(
+          'Archivar espacio',
+          `¿Archivar "${space.name}"? Los miembros dejarán de verlo y su código no funcionará. Tú lo verás en «Archivados» y podrás recuperarlo.`,
+          'Archivar',
+        )
+      : true;
+    if (!ok) return;
+    void run(
+      () => spacesApi.archive(token, spaceId, archive),
+      () => {
+        setSaved(archive ? 'Espacio archivado.' : 'Espacio recuperado: los miembros vuelven a verlo.');
+        void load();
+      },
+    );
+  };
+
   const deleteSpace = async () => {
     if (!token || !space) return;
     const ok = await confirmAction(
@@ -196,6 +216,12 @@ export default function Miembros() {
           />
           <Notice text={saved} tone="success" />
           <Button label={busy ? 'Guardando…' : 'Guardar nombre'} onPress={rename} disabled={busy} />
+          <Button
+            label={space.archived ? 'Desarchivar espacio' : 'Archivar espacio'}
+            kind="secondary"
+            onPress={() => void toggleArchive()}
+            disabled={busy}
+          />
           <Button label="Eliminar espacio" kind="destructive" onPress={() => void deleteSpace()} disabled={busy} />
         </View>
       )}

@@ -21,6 +21,33 @@ import { space } from '@/theme/tokens';
 
 const members = (n: number) => (n === 1 ? '1 miembro' : `${n} miembros`);
 
+function SpaceSection({ title, list, footer }: { title: string; list: SpaceSummary[]; footer?: string }) {
+  const { token } = useAuth();
+  const router = useRouter();
+  return (
+    <Section title={title} footer={footer}>
+      {list.map((s, i) => (
+        <FadeIn key={s.space_id} index={i}>
+          <ListRow
+            label={s.name}
+            leading={<Badge text={initials(s.name)} tone={s.archived ? 'neutral' : 'accent'} />}
+            onPressIn={() => token && prefetchSpace(token, s.space_id)}
+            onPress={() => router.push(`/espacio/${s.space_id}`)}
+          >
+            <Text variant="headline" numberOfLines={1}>
+              {s.name}
+            </Text>
+            <Text variant="caption" tone="secondary">
+              {members(s.member_count)}
+              {s.is_creator ? ' · creado por ti' : ''}
+            </Text>
+          </ListRow>
+        </FadeIn>
+      ))}
+    </Section>
+  );
+}
+
 export default function Home() {
   const { user, token, logout } = useAuth();
   const router = useRouter();
@@ -30,6 +57,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const active = spaces?.filter((s) => !s.archived) ?? null;
+  const archived = spaces?.filter((s) => s.archived) ?? [];
 
   const signOut = async () => {
     const ok = await confirmAction('Cerrar sesión', '¿Cerrar sesión en este dispositivo?', 'Cerrar sesión');
@@ -84,7 +113,7 @@ export default function Home() {
       <UpdateBanner />
       <Notice text={error} />
       {spaces === null && !error && <LoadingBar label="Cargando…" />}
-      {spaces?.length === 0 && (
+      {active?.length === 0 && (
         <FadeIn>
           <Card>
             <Text variant="headline">Aún no tienes espacios</Text>
@@ -96,27 +125,14 @@ export default function Home() {
           </Card>
         </FadeIn>
       )}
-      {!!spaces?.length && (
-        <Section title="Tus espacios">
-          {spaces.map((s, i) => (
-            <FadeIn key={s.space_id} index={i}>
-              <ListRow
-                label={s.name}
-                leading={<Badge text={initials(s.name)} />}
-                onPressIn={() => token && prefetchSpace(token, s.space_id)}
-                onPress={() => router.push(`/espacio/${s.space_id}`)}
-              >
-                <Text variant="headline" numberOfLines={1}>
-                  {s.name}
-                </Text>
-                <Text variant="caption" tone="secondary">
-                  {members(s.member_count)}
-                  {s.is_creator ? ' · creado por ti' : ''}
-                </Text>
-              </ListRow>
-            </FadeIn>
-          ))}
-        </Section>
+      {!!active?.length && <SpaceSection title="Tus espacios" list={active} />}
+      {/* Only their creator sees archived spaces; the members no longer do. */}
+      {!!archived.length && (
+        <SpaceSection
+          title="Archivados"
+          list={archived}
+          footer="Solo tú los ves. Ábrelo y en Miembros pulsa «Desarchivar espacio» para que el grupo lo vuelva a ver."
+        />
       )}
       {error && <Button label="Reintentar" kind="secondary" onPress={() => void load()} />}
 

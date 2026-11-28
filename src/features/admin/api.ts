@@ -25,6 +25,8 @@ export interface AdminSpace {
   join_code: string;
   creator_id: string;
   created_at: string;
+  /** Hidden from its members (its creator still sees it). */
+  archived: boolean;
   members: Array<{ user_id: string; username: string; is_creator: boolean }>;
 }
 
@@ -89,6 +91,12 @@ export const adminApi = {
   spaces: () => api<{ spaces: AdminSpace[] }>('/api/admin/spaces', { token: t() }),
   createSpace: (body: { name: string; creator_id: string; member_ids: string[] }) =>
     api<{ space: { space_id: string } }>('/api/admin/spaces', { method: 'POST', body, token: t() }),
+  archiveSpace: (id: string, archived: boolean) =>
+    api<{ space_id: string; archived: boolean }>(`/api/admin/spaces/${encodeURIComponent(id)}/archive`, {
+      method: 'PUT',
+      body: { archived },
+      token: t(),
+    }),
   deleteSpace: (id: string) => api<{ ok: true }>(`/api/admin/spaces/${encodeURIComponent(id)}`, { method: 'DELETE', token: t() }),
   addMembers: (id: string, userIds: string[]) =>
     api<{ ok: true }>(`/api/admin/spaces/${encodeURIComponent(id)}/members`, {

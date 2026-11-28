@@ -20,6 +20,7 @@ import {
 import { bearerToken, type Result } from './auth';
 import type { DataDeps } from './context';
 import { fail, SPACE_MSG } from './context';
+import { archivedFlag, archivedSpaces, setArchived } from './archive';
 import { creatorIds, idList, isListedUser, setCanCreate } from './creators';
 import { spaceNameError } from '../src/lib/spaces/validation';
 import { addMembersTo, insertSpace } from './spaces';
@@ -212,12 +213,18 @@ export interface AdminSpaceView {
   join_code: string;
   creator_id: string;
   created_at: string;
+  archived: boolean;
   members: Array<{ user_id: string; username: string; is_creator: boolean }>;
 }
 
 /** Every active space with its active members, newest first. */
 export async function listSpaces(deps: AdminDeps): Promise<Result> {
-  const [spaces, members, users] = await Promise.all([deps.spaces.list(), deps.members.list(), deps.users.list()]);
+  const [spaces, members, users, archived] = await Promise.all([
+    deps.spaces.list(),
+    deps.members.list(),
+    deps.users.list(),
+    archivedSpaces(deps),
+  ]);
   const names = new Map(users.map((u) => [u.value.user_id, u.value.username]));
   const list: AdminSpaceView[] = spaces
     .map((r) => r.value)
@@ -229,6 +236,7 @@ export async function listSpaces(deps: AdminDeps): Promise<Result> {
       join_code: s.join_code,
       creator_id: s.creator_id,
       created_at: s.created_at,
+      archived: archived.has(s.space_id),
       members: members
         .map((m) => m.value)
         .filter((m) => m.space_id === s.space_id && !isTrue(m.removed))
@@ -288,6 +296,15 @@ export async function removeSpaceMember(deps: AdminDeps, spaceId: string, userId
   if (!target) return fail(404, SPACE_MSG.memberNotFound);
   await deps.members.update(target.rowNumber, { removed: TRUE });
   return { status: 200, body: { ok: true } };
+}
+
+/** Body { archived }. Hide a space from its members (its creator still sees it), or bring it back. */
+export async function archiveSpaceAsAdmin(deps: AdminDeps, spaceId: string, body: unknown): Promise<Result> {
+  const archived = archivedFlag(body);
+  if (archived === null) return fail(400, 'Datos no válidos.');
+  if (!(await activeSpace(deps, spaceId))) return fail(404, SPACE_MSG.notFound);
+  await setArchived(deps, spaceId, archived);
+  return { status: 200, body: { space_id: spaceId, archived } };
 }
 
 /** Soft delete, like the creator's "Eliminar espacio". */

@@ -9,6 +9,13 @@ export interface SpaceSummary {
   join_code: string;
   is_creator: boolean;
   member_count: number;
+  /** Hidden from its members; only its creator (and the admin) still see it. */
+  archived?: boolean;
+}
+
+/** A photo of the last 7 days. `url` is a relative /api path with a signed link. */
+export interface PhotoView extends PostView {
+  url: string;
 }
 
 export interface SpaceDetail extends SpaceSummary {
@@ -35,6 +42,9 @@ export const spacesApi = {
   remove: (token: string, id: string) => api<{ ok: true }>(base(id), { method: 'DELETE', token }),
   removeMember: (token: string, id: string, userId: string) =>
     api<{ ok: true }>(`${base(id)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE', token }),
+  photos: (token: string, id: string) => api<{ photos: PhotoView[] }>(`${base(id)}/photos`, { token }),
+  archive: (token: string, id: string, archived: boolean) =>
+    api<{ space_id: string; archived: boolean }>(`${base(id)}/archive`, { method: 'POST', body: { archived }, token }),
   posts: (token: string, id: string) => api<{ posts: PostView[] }>(`${base(id)}/posts`, { token }),
   post: (token: string, id: string, postId: string) =>
     api<{ post: PostView }>(`${base(id)}/posts/${encodeURIComponent(postId)}`, { token }),

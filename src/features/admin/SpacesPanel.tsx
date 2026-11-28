@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Badge, initials } from '@/components/Badge';
+import { Badge, Chip, initials } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { ListRow } from '@/components/ListRow';
 import { Notice } from '@/components/Notice';
@@ -110,6 +110,14 @@ function SpaceCard({
     }
   };
 
+  const toggleArchive = async () => {
+    const archive = !s.archived;
+    const ok = archive
+      ? await confirmAction('Archivar espacio', `¿Archivar "${s.name}"? Sus miembros dejarán de verlo; quien lo creó aún lo ve.`, 'Archivar')
+      : true;
+    if (ok) await run(() => adminApi.archiveSpace(s.space_id, archive));
+  };
+
   const remove = async () => {
     const ok = await confirmAction('Eliminar espacio', `¿Eliminar "${s.name}"? Nadie podrá volver a entrar.`, 'Eliminar');
     if (ok) await run(() => adminApi.deleteSpace(s.space_id));
@@ -118,7 +126,12 @@ function SpaceCard({
   return (
     <View style={styles.card}>
       <View>
-        <Text variant="headline">{s.name}</Text>
+        <View style={styles.nameRow}>
+          <Text variant="headline" style={styles.grow}>
+            {s.name}
+          </Text>
+          {s.archived && <Chip label="Archivado" tone="neutral" />}
+        </View>
         <Text variant="caption" tone="secondary">
           Código {s.join_code} · creado por {creator} · {formatDateTime(s.created_at)}
         </Text>
@@ -160,8 +173,11 @@ function SpaceCard({
       ) : (
         <View style={styles.row}>
           <Button label="Añadir" kind="secondary" onPress={() => setAdding(true)} disabled={busy} flex />
-          <Button label="Eliminar" kind="destructive" onPress={() => void remove()} disabled={busy} flex />
+          <Button label={s.archived ? 'Desarchivar' : 'Archivar'} kind="secondary" onPress={() => void toggleArchive()} disabled={busy} flex />
         </View>
+      )}
+      {!adding && (
+        <Button label="Eliminar espacio" kind="destructive" onPress={() => void remove()} disabled={busy} />
       )}
     </View>
   );
@@ -238,6 +254,8 @@ export function SpacesPanel({ onSessionEnded }: { onSessionEnded: () => void }) 
 const styles = StyleSheet.create({
   block: { gap: space(2) },
   row: { flexDirection: 'row', gap: space(1) },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: space(1) },
+  grow: { flex: 1 },
   // Sections inside already draw the cards; a hairline separates one space from the next.
   card: { gap: space(1.5), paddingTop: space(2), borderTopWidth: rule.width, borderTopColor: rule.color },
 });

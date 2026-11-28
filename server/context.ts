@@ -2,6 +2,7 @@
 import { bearerToken, MSG, type Result, sessionUserValid } from './auth';
 import type { MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
 import type { SettingsStore } from './settings';
+import { archivedIds } from './archive';
 import { type SessionPayload, verifySession } from './session';
 import { isTrue, type Table } from './table';
 
@@ -55,16 +56,27 @@ export interface Membership {
   spaceRow: number;
   member: MemberRecord;
   isCreator: boolean;
+  archived: boolean;
 }
 
-/** The caller's active membership of an active space, or a 404 Result. */
+/**
+ * The caller's active membership of an active space, or a 404 Result. An
+ * archived space is hidden from everyone but its creator.
+ */
 export async function membership(deps: DataDeps, spaceId: string, userId: string): Promise<Membership | Result> {
-  const [spaces, members] = await Promise.all([deps.spaces.list(), deps.members.list()]);
+  const [spaces, members, settings] = await Promise.all([deps.spaces.list(), deps.members.list(), deps.settings.getAll()]);
   const s = spaces.find((r) => r.value.space_id === spaceId && !isTrue(r.value.deleted));
   if (!s) return fail(404, SPACE_MSG.notFound);
+  if (s.value.creator_id !== userId && archivedIds(settings).has(spaceId)) return fail(404, SPACE_MSG.notFound);
   const m = members.find((r) => r.value.space_id === spaceId && r.value.user_id === userId && !isTrue(r.value.removed));
   if (!m) return fail(404, SPACE_MSG.notFound);
-  return { space: s.value, spaceRow: s.rowNumber, member: m.value, isCreator: s.value.creator_id === userId };
+  return {
+    space: s.value,
+    spaceRow: s.rowNumber,
+    member: m.value,
+    isCreator: s.value.creator_id === userId,
+    archived: archivedIds(settings).has(spaceId),
+  };
 }
 
 export const iso = (deps: DataDeps): string => new Date(deps.now()).toISOString();
