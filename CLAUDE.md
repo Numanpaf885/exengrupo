@@ -362,6 +362,13 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
 - The server logs every rejected photo (`photo rejected (status): reason bytes=N`).
 - Speed: `src/lib/memo.ts` in-memory stale-while-revalidate cache (cleared on
   logout) + `src/features/spaces/cache.ts`; touching a space row prefetches it.
+- Live speed (2026-11-28): `listPosts`/`getPost` start all their Sheet reads at once
+  (`warmFeedReads`; the client shares in-flight reads), so a phone fetching a
+  broadcast post waits one round trip, not three. `createPost` reads its row number
+  while the AI works, so "done" is saved and broadcast without a Sheet read first
+  (it re-reads if that early read missed the new row). The space screen reloads
+  when the app/tab comes back to the foreground (a locked phone misses broadcasts);
+  "Actualizar" is only shown when Realtime isn't configured.
 
 ### Home extras and full screen mode (added 2026-11-25, user request)
 

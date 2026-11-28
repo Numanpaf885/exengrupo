@@ -25,6 +25,16 @@ async function setup(outcome: AiOutcome | Error = { status: 'done', answer: '1.a
 }
 
 describe('createPost', () => {
+  it('still saves the answer when the early row read missed the new row', async () => {
+    const { deps, base, space } = await setup();
+    const real = base.posts.list.bind(base.posts);
+    let calls = 0;
+    deps.posts = { ...base.posts, list: async () => (++calls === 1 ? [] : real()) };
+    const res = await createPost(deps, bearer('luis'), space.space_id, JPEG);
+    expect(res.status).toBe(201);
+    expect(base.posts.rows[0]).toMatchObject({ status: 'done', answer: '1.a  2.V' });
+  });
+
   it('stores the photo, saves the answer and broadcasts only the post id', async () => {
     const { deps, base, space, put, broadcast, analyze } = await setup();
     const res = await createPost(deps, bearer('luis'), space.space_id, JPEG);
