@@ -67,6 +67,14 @@
           "photosPermission": false
         }
       ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": false,
+          "granularPermissions": ["photo"]
+        }
+      ],
       "./plugins/withAndroidReleaseSigning"
     ],
     "experiments": {

@@ -17,6 +17,7 @@ import { Text } from '@/components/Text';
 import { useAuth } from '@/features/auth/AuthContext';
 import { type PhotoView, spacesApi } from '@/features/spaces/api';
 import { AnswerList } from '@/features/spaces/AnswerList';
+import { savePhoto } from '@/features/spaces/savePhoto';
 import { apiUrl } from '@/lib/api';
 import { memo } from '@/lib/memo';
 import { formatPostTime } from '@/lib/time';
@@ -27,6 +28,17 @@ const key = (id: string) => `photos:${id}`;
 function PhotoViewer({ photo, onClose }: { photo: PhotoView; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(null);
+    const name = `exengrupo-${photo.created_at.slice(0, 16).replace(/[:T]/g, '-')}`;
+    setSaved((await savePhoto(apiUrl(photo.url), name)) || null);
+    setSaving(false);
+  };
+
   return (
     <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={[styles.viewer, { paddingTop: insets.top }]}>
@@ -46,6 +58,8 @@ function PhotoViewer({ photo, onClose }: { photo: PhotoView; onClose: () => void
             resizeMode="contain"
             accessibilityLabel={`Foto de ${photo.username}`}
           />
+          <Button label={saving ? 'Guardando…' : 'Guardar en el teléfono'} kind="secondary" onPress={() => void save()} disabled={saving} />
+          {saved && <Text tone="secondary">{saved}</Text>}
           {photo.status === 'done' ? (
             <Card>
               <AnswerList answer={photo.answer} labels={photo.labels ?? {}} />
