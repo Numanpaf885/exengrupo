@@ -383,6 +383,15 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   none, the home-screen app is already full screen). Remembered per space in `memo`
   while the app is open, so it survives going to the camera and back.
 
+### Save a photo (2026-11-28, user request)
+
+- Fotos viewer → "Guardar en el teléfono" (`src/features/spaces/savePhoto(.web).ts`).
+  Android: expo-media-library (`/legacy` API, write-only permission asked the first
+  time; app.json plugin with `granularPermissions: ["photo"]`, no iOS strings)
+  downloads to the cache with expo-file-system and saves it to the gallery.
+  Web/iPhone: Web Share with the file (iPhone's sheet has "Guardar imagen"), else a
+  normal download (computers).
+
 ### Archive v2, owner powers, no code/invite on the space (2026-11-28, user request)
 
 - Archived spaces are NO LONGER hidden from members: every member still sees and
