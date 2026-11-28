@@ -7,6 +7,7 @@ import { normalizeSpaceName, spaceNameError } from '../src/lib/spaces/validation
 import type { Result } from './auth';
 import { channelIdFromBytes, normalizeJoinCode, uniqueJoinCode } from './codes';
 import { authenticate, type DataDeps, fail, isResult, iso, membership, SPACE_MSG } from './context';
+import { archivedFlag, archivedSpaces, setArchived } from './archive';
 import { canCreateSpaces, idList, isListedUser, people } from './creators';
 import { ROLE_CREATOR, ROLE_MEMBER, type SpaceRecord } from './schema';
 import { FALSE, isTrue, TRUE } from './table';
@@ -17,6 +18,8 @@ export interface SpaceSummary {
   join_code: string;
   is_creator: boolean;
   member_count: number;
+  /** Hidden from the members; only its creator (and the admin) still see it. */
+  archived?: boolean;
 }
 
 export interface SpaceDetail extends SpaceSummary {
@@ -33,16 +36,19 @@ function nameFrom(body: unknown): string | null {
 export async function listMySpaces(deps: DataDeps, auth: string | null): Promise<Result> {
   const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
-  const [spaces, members, canCreate] = await Promise.all([
+  const [spaces, members, canCreate, archived] = await Promise.all([
     deps.spaces.list(),
     deps.members.list(),
     canCreateSpaces(deps, session.sub),
+    archivedSpaces(deps),
   ]);
   const active = members.filter((m) => !isTrue(m.value.removed));
   const mine = new Set(active.filter((m) => m.value.user_id === session.sub).map((m) => m.value.space_id));
   const list: SpaceSummary[] = spaces
     .map((s) => s.value)
     .filter((s) => mine.has(s.space_id) && !isTrue(s.deleted))
+    // Archived: only the creator still sees it (marked, under "Archivados").
+    .filter((s) => !archived.has(s.space_id) || s.creator_id === session.sub)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .map((s) => ({
       space_id: s.space_id,
@@ -50,6 +56,7 @@ export async function listMySpaces(deps: DataDeps, auth: string | null): Promise
       join_code: s.join_code,
       is_creator: s.creator_id === session.sub,
       member_count: active.filter((m) => m.value.space_id === s.space_id).length,
+      archived: archived.has(s.space_id),
     }));
   return { status: 200, body: { spaces: list, can_create: canCreate } };
 }
@@ -172,7 +179,7 @@ export async function joinSpace(deps: DataDeps, auth: string | null, body: unkno
 
   const [spaces, members] = await Promise.all([deps.spaces.list(), deps.members.list()]);
   const space = spaces.find((s) => s.value.join_code === code && !isTrue(s.value.deleted))?.value;
-  if (!space) return fail(404, SPACE_MSG.codeNotFound);
+  if (!space || (await archivedSpaces(deps)).has(space.space_id)) return fail(404, SPACE_MSG.codeNotFound);
   const mine = members.filter((m) => m.value.space_id === space.space_id && m.value.user_id === session.sub);
   if (mine.some((m) => !isTrue(m.value.removed))) {
     return { status: 200, body: { space: { space_id: space.space_id, name: space.name } } };
@@ -207,6 +214,7 @@ export async function getSpace(deps: DataDeps, auth: string | null, spaceId: str
     channel_id: m.space.channel_id,
     is_creator: m.isCreator,
     member_count: active.length,
+    archived: m.archived,
     members: active.map((r) => ({
       user_id: r.user_id,
       username: names.get(r.user_id) ?? '—',
@@ -229,6 +237,19 @@ export async function renameSpace(deps: DataDeps, auth: string | null, spaceId: 
   const name = normalizeSpaceName(raw);
   await deps.spaces.update(m.spaceRow, { name });
   return { status: 200, body: { space: { space_id: spaceId, name } } };
+}
+
+/** Body { archived: boolean }. Creator only: hide the space from its members, or bring it back. */
+export async function archiveSpace(deps: DataDeps, auth: string | null, spaceId: string, body: unknown): Promise<Result> {
+  const session = await authenticate(deps, auth);
+  if (isResult(session)) return session;
+  const m = await membership(deps, spaceId, session.sub);
+  if (isResult(m)) return m;
+  if (!m.isCreator) return fail(403, SPACE_MSG.creatorOnly);
+  const archived = archivedFlag(body);
+  if (archived === null) return fail(400, 'Datos no válidos.');
+  await setArchived(deps, spaceId, archived);
+  return { status: 200, body: { space_id: spaceId, archived } };
 }
 
 export async function deleteSpace(deps: DataDeps, auth: string | null, spaceId: string): Promise<Result> {

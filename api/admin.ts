@@ -9,6 +9,7 @@
  *   GET    /api/admin/spaces                 every space with its members
  *   POST   /api/admin/spaces                 { name, creator_id, member_ids? } create for a user
  *   DELETE /api/admin/spaces/:id             soft delete
+ *   PUT    /api/admin/spaces/:id/archive     { archived } hide from members / bring back
  *   POST   /api/admin/spaces/:id/members     { user_ids } add people
  *   DELETE /api/admin/spaces/:id/members/:u  soft remove (not the creator)
  *   GET    /api/admin/keys                   AI providers (key hints only), order
@@ -19,6 +20,7 @@
 import {
   addSpaceMembers,
   adminLogin,
+  archiveSpaceAsAdmin,
   createSpaceFor,
   createUser,
   deleteSpaceAsAdmin,
@@ -64,6 +66,8 @@ async function dispatch(request: Request): Promise<Result> {
       return listSpaces(deps);
     case 'createSpace':
       return createSpaceFor(deps, await readJson(request));
+    case 'archiveSpace':
+      return archiveSpaceAsAdmin(deps, route.spaceId, await readJson(request));
     case 'deleteSpace':
       return deleteSpaceAsAdmin(deps, route.spaceId);
     case 'addMembers':

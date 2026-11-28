@@ -376,6 +376,28 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   none, the home-screen app is already full screen). Remembered per space in `memo`
   while the app is open, so it survives going to the camera and back.
 
+### Fotos screen and archived spaces (added 2026-11-28, user request)
+
+- Space header: "Fotos · Archivos · Miembros (n)". `espacio/[id]/fotos`: the
+  space's photos of the last 7 days (posts with `photo_expires_at` in the future,
+  newest first, max 60) in a 2-column grid; tapping one opens a full-screen viewer
+  with sender, time and its answers (`AnswerList`, now in `src/features/spaces/`).
+- `GET /api/spaces/:id/photos` (members) returns each post plus a signed link
+  `/api/spaces/:id/photos/:postId?t=p1.<payload>.<HMAC>` (`server/photos.ts`);
+  `<Image>` can't send the session header. The link is the same for a 6-hour
+  window (valid 6–12 h) so the phone can cache it (`private, max-age=21600`). The
+  image route reads only R2 (no Sheet) and is answered in `api/spaces.ts` before
+  `respond()` (bytes, not JSON). Anyone holding a link can open that one photo
+  until it expires.
+- Archive (hide) a space: `ajustes` row `archived_spaces` = comma-separated
+  space_ids (`server/archive.ts`; no Sheet schema change). `membership()` returns
+  404 to everyone but the creator, `listMySpaces` hides it from members and marks
+  it `archived` for the creator (home "Archivados" section), and the join code stops
+  working. Creator: Miembros → "Archivar espacio" / "Desarchivar espacio"
+  (`POST /api/spaces/:id/archive {archived}`). Admin → Espacios: "Archivado" chip,
+  "Archivar"/"Desarchivar" (`PUT /api/admin/spaces/:id/archive`). Deleting is
+  unchanged (creator or admin). 30 s settings cache per server instance.
+
 ### Desktop layout (added 2026-11-22, user request)
 
 - Only web windows ≥ 900 px wide (`useDesktop()` in `src/lib/useDesktop.ts`) get it;

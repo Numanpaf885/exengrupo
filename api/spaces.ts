@@ -7,6 +7,9 @@
  *   GET    /api/spaces/:id                     details + members
  *   PATCH  /api/spaces/:id                     rename { name }        (creator)
  *   DELETE /api/spaces/:id                     soft delete            (creator)
+ *   POST   /api/spaces/:id/archive             { archived } hide/show for members (creator)
+ *   GET    /api/spaces/:id/photos              photos of the last 7 days + signed links
+ *   GET    /api/spaces/:id/photos/:postId?t=   the JPEG (signed link, no session header)
  *   POST   /api/spaces/:id/members             add { user_ids }       (creator)
  *   DELETE /api/spaces/:id/members/:userId     soft remove member     (creator)
  *   GET    /api/spaces/:id/posts               feed, newest first
@@ -19,12 +22,14 @@
  *   DELETE /api/spaces/:id/files/:fileId       soft delete + remove from R2 (uploader/creator)
  */
 import type { Result } from '../server/auth';
+import { getPhoto, listPhotos } from '../server/photos';
 import { createPost, getPost, listPosts } from '../server/posts';
 import { matchSpacesRoute, spacesPath } from '../server/router';
 import { createFile, deleteFile, listFiles, processFile, uploadChunk } from '../server/files/handlers';
-import { dataDeps, fileDeps, postDeps, readJson, respond } from '../server/http';
+import { dataDeps, fileDeps, photoDeps, postDeps, readJson, respond } from '../server/http';
 import {
   addMembers,
+  archiveSpace,
   createSpace,
   deleteSpace,
   getSpace,
@@ -61,6 +66,10 @@ async function dispatch(request: Request): Promise<Result> {
       return listPeople(dataDeps(), auth);
     case 'addMembers':
       return addMembers(dataDeps(), auth, route.spaceId, await readJson(request));
+    case 'archive':
+      return archiveSpace(dataDeps(), auth, route.spaceId, await readJson(request));
+    case 'listPhotos':
+      return listPhotos(dataDeps(), auth, route.spaceId);
     case 'get':
       return getSpace(dataDeps(), auth, route.spaceId);
     case 'rename':
@@ -99,7 +108,27 @@ async function dispatch(request: Request): Promise<Result> {
   }
 }
 
-const handler = (request: Request): Promise<Response> => respond(() => dispatch(request));
+/** Photos are bytes, not JSON: answered here, outside respond(). */
+async function photo(request: Request, spaceId: string, postId: string): Promise<Response> {
+  try {
+    const res = await getPhoto(photoDeps(), new URL(request.url).searchParams.get('t'), spaceId, postId);
+    if (res.status !== 200) return new Response(null, { status: res.status, headers: { 'cache-control': 'no-store' } });
+    return new Response(res.bytes as unknown as BodyInit, {
+      status: 200,
+      // The link is the same for a 6-hour window: let the phone keep the image that long.
+      headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=21600' },
+    });
+  } catch (e) {
+    console.error('photo failed', e instanceof Error ? e.message : e);
+    return new Response(null, { status: 500, headers: { 'cache-control': 'no-store' } });
+  }
+}
+
+const handler = (request: Request): Promise<Response> => {
+  const route = matchSpacesRoute(request.method, spacesPath(new URL(request.url)));
+  if (route.name === 'getPhoto') return photo(request, route.spaceId, route.postId);
+  return respond(() => dispatch(request));
+};
 
 export const GET = handler;
 export const POST = handler;
