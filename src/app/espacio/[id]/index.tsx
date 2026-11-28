@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { BackHandler, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { RoundUploadButton } from '@/components/RoundButton';
 import { FadeIn } from '@/components/FadeIn';
@@ -214,6 +214,14 @@ export default function Espacio() {
     }, [load]),
   );
 
+  // A locked phone or hidden tab misses live messages: catch up when it comes back.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void load();
+    });
+    return () => sub.remove();
+  }, [load]);
+
   // Reload when one of my uploads finishes.
   useEffect(() => {
     if (uploads.finished > 0) void load();
@@ -373,7 +381,7 @@ export default function Espacio() {
         </FadeIn>
       )}
 
-      {(Platform.OS === 'web' || !realtimeConfigured) && (
+      {!realtimeConfigured && (
         <View style={styles.more}>
           <Button kind="ghost" label="Actualizar" onPress={() => void refresh()} />
           {!realtimeConfigured && <Text tone="secondary">Las respuestas nuevas aparecen al pulsar Actualizar.</Text>}

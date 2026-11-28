@@ -99,6 +99,8 @@ export async function createPost(
     photo_expires_at: new Date(deps.now() + PHOTO_DAYS * 24 * 60 * 60 * 1000).toISOString(),
   };
   await deps.posts.append(record);
+  // Find our row while the AI works, so saving the answer needs no Sheet read (rows are only ever appended).
+  const rowsRead = deps.posts.list().catch(() => null);
   await safeBroadcast(deps, m.space.channel_id, postId);
 
   let outcome: AiOutcome;
@@ -109,8 +111,9 @@ export async function createPost(
     outcome = { status: 'error', answer: AI_FAILED, models: '' };
   }
 
-  const rows = await deps.posts.list();
-  const row = rows.find((r) => r.value.post_id === postId);
+  const find = (rows: Array<{ rowNumber: number; value: PostRecord }> | null) => rows?.find((r) => r.value.post_id === postId);
+  // The early read may have shared a read that started before our append: then read again.
+  const row = find(await rowsRead) ?? find(await deps.posts.list());
   const patch = {
     status: outcome.status === 'done' ? POST_DONE : POST_ERROR,
     answer: outcome.answer,
@@ -128,7 +131,12 @@ async function usernames(deps: DataDeps): Promise<Map<string, string>> {
   return new Map(users.map((u) => [u.value.user_id, u.value.username]));
 }
 
+/** Start every Sheet read a feed request needs at once (one round trip instead of three); the handlers then share them. */
+const warmFeedReads = (deps: DataDeps) =>
+  void Promise.all([deps.users.list(), deps.spaces.list(), deps.members.list(), deps.posts.list()]).catch(() => undefined);
+
 export async function listPosts(deps: DataDeps, auth: string | null, spaceId: string): Promise<Result> {
+  warmFeedReads(deps);
   const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
@@ -144,6 +152,7 @@ export async function listPosts(deps: DataDeps, auth: string | null, spaceId: st
 }
 
 export async function getPost(deps: DataDeps, auth: string | null, spaceId: string, postId: string) {
+  warmFeedReads(deps);
   const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
   const m = await membership(deps, spaceId, session.sub);
