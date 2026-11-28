@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, BackHandler, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { RoundUploadButton } from '@/components/RoundButton';
 import { FadeIn } from '@/components/FadeIn';
@@ -19,7 +19,7 @@ import { upsertPost } from '@/features/spaces/feed';
 import { pickPhoto } from '@/features/camera/pickPhoto';
 import { dismissUpload, startUpload, useUploads } from '@/features/spaces/uploads';
 import { compressPhoto } from '@/lib/photo/compress';
-import { realtimeConfigured, WEB_URL } from '@/lib/config';
+import { realtimeConfigured } from '@/lib/config';
 import type { PostView } from '@/lib/photo/upload';
 import { subscribeToSpace } from '@/lib/realtime';
 import { enterFullscreen, exitFullscreen, onFullscreenExit } from '@/lib/fullscreen';
@@ -211,14 +211,6 @@ export default function Espacio() {
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
-  const share = () => {
-    if (!space) return;
-    const link = `${WEB_URL}/unirse/${space.join_code}`;
-    void Share.share({
-      message: `Únete a "${space.name}" en exengrupo. Código: ${space.join_code} — ${link}`,
-    }).catch(() => undefined);
-  };
-
   if (notFound) {
     return (
       <Screen onBack={() => router.replace('/')}>
@@ -317,16 +309,12 @@ export default function Espacio() {
         </Text>
         {space && (
           <View style={styles.codeRow}>
-            <Text variant="label" tone="secondary" selectable>
-              Código {space.join_code}
-            </Text>
-            <Button kind="secondary" small label="Invitar" onPress={share} />
             <Button kind="secondary" small label="Pantalla completa" onPress={() => setFocus(true)} />
           </View>
         )}
         {space?.archived && (
           <Text variant="caption" tone="secondary">
-            Archivado: los miembros no lo ven. Recupéralo en Miembros.
+            Espacio archivado: está en «Espacios archivados». Recupéralo en Miembros.
           </Text>
         )}
       </View>

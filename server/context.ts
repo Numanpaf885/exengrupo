@@ -3,6 +3,7 @@ import { bearerToken, MSG, type Result, sessionUserValid } from './auth';
 import type { MemberRecord, PostRecord, SpaceRecord, UserRecord } from './schema';
 import type { SettingsStore } from './settings';
 import { archivedIds } from './archive';
+import { isOwner } from './creators';
 import { type SessionPayload, verifySession } from './session';
 import { isTrue, type Table } from './table';
 
@@ -55,26 +56,28 @@ export interface Membership {
   space: SpaceRecord;
   spaceRow: number;
   member: MemberRecord;
+  /** May manage the space (rename, members, archive, delete): its creator, or the owner (numan). */
   isCreator: boolean;
   archived: boolean;
 }
 
-/**
- * The caller's active membership of an active space, or a 404 Result. An
- * archived space is hidden from everyone but its creator.
- */
+/** The caller's active membership of an active space, or a 404 Result. */
 export async function membership(deps: DataDeps, spaceId: string, userId: string): Promise<Membership | Result> {
-  const [spaces, members, settings] = await Promise.all([deps.spaces.list(), deps.members.list(), deps.settings.getAll()]);
+  const [spaces, members, settings, users] = await Promise.all([
+    deps.spaces.list(),
+    deps.members.list(),
+    deps.settings.getAll(),
+    deps.users.list(),
+  ]);
   const s = spaces.find((r) => r.value.space_id === spaceId && !isTrue(r.value.deleted));
   if (!s) return fail(404, SPACE_MSG.notFound);
-  if (s.value.creator_id !== userId && archivedIds(settings).has(spaceId)) return fail(404, SPACE_MSG.notFound);
   const m = members.find((r) => r.value.space_id === spaceId && r.value.user_id === userId && !isTrue(r.value.removed));
   if (!m) return fail(404, SPACE_MSG.notFound);
   return {
     space: s.value,
     spaceRow: s.rowNumber,
     member: m.value,
-    isCreator: s.value.creator_id === userId,
+    isCreator: s.value.creator_id === userId || isOwner(users.find((u) => u.value.user_id === userId)?.value.username),
     archived: archivedIds(settings).has(spaceId),
   };
 }

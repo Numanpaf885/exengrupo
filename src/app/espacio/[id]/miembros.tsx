@@ -116,7 +116,7 @@ export default function Miembros() {
     const ok = archive
       ? await confirmAction(
           'Archivar espacio',
-          `¿Archivar "${space.name}"? Los miembros dejarán de verlo y su código no funcionará. Tú lo verás en «Archivados» y podrás recuperarlo.`,
+          `¿Archivar "${space.name}"? Pasará a «Espacios archivados» (Inicio → Más) para todos los miembros y su código dejará de funcionar.`,
           'Archivar',
         )
       : true;
@@ -124,7 +124,7 @@ export default function Miembros() {
     void run(
       () => spacesApi.archive(token, spaceId, archive),
       () => {
-        setSaved(archive ? 'Espacio archivado.' : 'Espacio recuperado: los miembros vuelven a verlo.');
+        setSaved(archive ? 'Espacio archivado.' : 'Espacio recuperado: vuelve a la lista principal.');
         void load();
       },
     );

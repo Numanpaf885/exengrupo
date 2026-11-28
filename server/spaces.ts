@@ -47,8 +47,6 @@ export async function listMySpaces(deps: DataDeps, auth: string | null): Promise
   const list: SpaceSummary[] = spaces
     .map((s) => s.value)
     .filter((s) => mine.has(s.space_id) && !isTrue(s.deleted))
-    // Archived: only the creator still sees it (marked, under "Archivados").
-    .filter((s) => !archived.has(s.space_id) || s.creator_id === session.sub)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .map((s) => ({
       space_id: s.space_id,
@@ -239,7 +237,7 @@ export async function renameSpace(deps: DataDeps, auth: string | null, spaceId: 
   return { status: 200, body: { space: { space_id: spaceId, name } } };
 }
 
-/** Body { archived: boolean }. Creator only: hide the space from its members, or bring it back. */
+/** Body { archived: boolean }. Creator/owner: move the space to everyone's "Espacios archivados", or back. */
 export async function archiveSpace(deps: DataDeps, auth: string | null, spaceId: string, body: unknown): Promise<Result> {
   const session = await authenticate(deps, auth);
   if (isResult(session)) return session;
@@ -274,6 +272,7 @@ export async function removeMember(
   if (isResult(m)) return m;
   if (!m.isCreator) return fail(403, SPACE_MSG.creatorOnly);
   if (userId === session.sub) return fail(400, SPACE_MSG.cannotRemoveSelf);
+  if (userId === m.space.creator_id) return fail(400, SPACE_MSG.cannotRemoveCreator);
   const members = await deps.members.list();
   const target = members.find(
     (r) => r.value.space_id === spaceId && r.value.user_id === userId && !isTrue(r.value.removed),

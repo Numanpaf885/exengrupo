@@ -5,7 +5,16 @@ import { SPACE_MSG } from './context';
 import { getPhoto, listPhotos, PHOTO_LINK_WINDOW_MS, type PhotoItem, signPhotoLink, verifyPhotoLink } from './photos';
 import { createPost, type PostDeps } from './posts';
 import { matchAdminRoute, matchSpacesRoute } from './router';
-import { archiveSpace, createSpace, getSpace, joinSpace, listMySpaces, type SpaceDetail, type SpaceSummary } from './spaces';
+import {
+  archiveSpace,
+  createSpace,
+  getSpace,
+  joinSpace,
+  listMySpaces,
+  removeMember,
+  type SpaceDetail,
+  type SpaceSummary,
+} from './spaces';
 import { memoryStorage } from './storage';
 import { bearer, TEST_NOW, TEST_SECRET, testDeps } from './testing';
 import { listPosts } from './posts';
@@ -85,15 +94,17 @@ describe('listPhotos / getPhoto', () => {
 });
 
 describe('archived spaces', () => {
-  it('the creator archives: members lose it (list, feed, code), the creator still sees it marked', async () => {
+  it('the creator archives: every member still sees it, marked archived; its code stops working', async () => {
     const { deps, base, space } = await setup();
     expect((await archiveSpace(deps, bearer('luis'), space.space_id, { archived: true })).status).toBe(403);
     expect((await archiveSpace(deps, bearer('ana'), space.space_id, { archived: 'yes' })).status).toBe(400);
     expect((await archiveSpace(deps, bearer('ana'), space.space_id, { archived: true })).status).toBe(200);
     expect(archivedIds(base.settings.values)).toEqual(new Set([space.space_id]));
 
-    expect(((await listMySpaces(deps, bearer('luis'))).body as { spaces: unknown[] }).spaces).toEqual([]);
-    expect((await listPosts(deps, bearer('luis'), space.space_id)).status).toBe(404);
+    expect(((await listMySpaces(deps, bearer('luis'))).body as { spaces: SpaceSummary[] }).spaces).toMatchObject([
+      { space_id: space.space_id, archived: true },
+    ]);
+    expect((await listPosts(deps, bearer('luis'), space.space_id)).status).toBe(200);
     expect((await joinSpace(deps, bearer('eva'), { code: space.join_code })).body).toEqual({ error: SPACE_MSG.codeNotFound });
 
     const mine = ((await listMySpaces(deps, bearer('ana'))).body as { spaces: SpaceSummary[] }).spaces;
@@ -114,7 +125,24 @@ describe('archived spaces', () => {
     expect(((await listSpaces(admin)).body as { spaces: Array<{ archived: boolean }> }).spaces[0].archived).toBe(true);
     expect((await archiveSpaceAsAdmin(admin, 'nope', { archived: true })).status).toBe(404);
     expect((await archiveSpaceAsAdmin(admin, space.space_id, {})).status).toBe(400);
-    expect(((await listMySpaces(deps, bearer('luis'))).body as { spaces: unknown[] }).spaces).toEqual([]);
+    expect(((await listMySpaces(deps, bearer('luis'))).body as { spaces: SpaceSummary[] }).spaces[0].archived).toBe(true);
+  });
+});
+
+describe('owner (numan)', () => {
+  it('manages spaces he did not create, but cannot remove their creator', async () => {
+    const base = testDeps([
+      { id: 'ana', name: 'ana' },
+      { id: 'u-numan', name: 'numan' },
+      { id: 'luis', name: 'luis' },
+    ]);
+    const space = ((await createSpace(base, bearer('ana'), { name: 'Bio', member_ids: ['u-numan', 'luis'] })).body as { space: SpaceSummary }).space;
+    expect(((await getSpace(base, bearer('u-numan'), space.space_id)).body as { space: SpaceDetail }).space.is_creator).toBe(true);
+    expect(((await getSpace(base, bearer('luis'), space.space_id)).body as { space: SpaceDetail }).space.is_creator).toBe(false);
+    expect((await archiveSpace(base, bearer('u-numan'), space.space_id, { archived: true })).status).toBe(200);
+    expect((await archiveSpace(base, bearer('luis'), space.space_id, { archived: false })).status).toBe(403);
+    expect((await removeMember(base, bearer('u-numan'), space.space_id, 'ana')).body).toEqual({ error: SPACE_MSG.cannotRemoveCreator });
+    expect((await removeMember(base, bearer('u-numan'), space.space_id, 'luis')).status).toBe(200);
   });
 });
 

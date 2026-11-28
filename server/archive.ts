@@ -1,9 +1,9 @@
 /**
  * Archived (hidden) spaces (user decision 2026-11-28). Stored in the "ajustes"
  * tab as `archived_spaces` = comma-separated space_ids, so the fixed spaces tab
- * is untouched. An archived space disappears for its members and its code stops
- * working; its creator still sees it under "Archivados" and can bring it back,
- * and so can the admin.
+ * is untouched. Changed 2026-11-28: every member still sees and opens it, but
+ * under "Espacios archivados" (home → Más) instead of the main list; its join
+ * code stops working. Its creator, the owner (numan) or the admin bring it back.
  */
 import type { DataDeps } from './context';
 
