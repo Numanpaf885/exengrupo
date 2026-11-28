@@ -113,7 +113,7 @@ function SpaceCard({
   const toggleArchive = async () => {
     const archive = !s.archived;
     const ok = archive
-      ? await confirmAction('Archivar espacio', `¿Archivar "${s.name}"? Sus miembros dejarán de verlo; quien lo creó aún lo ve.`, 'Archivar')
+      ? await confirmAction('Archivar espacio', `¿Archivar "${s.name}"? Pasará a «Espacios archivados» para todos sus miembros.`, 'Archivar')
       : true;
     if (ok) await run(() => adminApi.archiveSpace(s.space_id, archive));
   };

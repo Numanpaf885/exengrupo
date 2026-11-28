@@ -383,6 +383,19 @@ Built in 5 slices. Do ONE slice at a time, then stop and wait for the user to sa
   none, the home-screen app is already full screen). Remembered per space in `memo`
   while the app is open, so it survives going to the camera and back.
 
+### Archive v2, owner powers, no code/invite on the space (2026-11-28, user request)
+
+- Archived spaces are NO LONGER hidden from members: every member still sees and
+  opens them, but they leave the main home list and appear under home → "Más" →
+  "Espacios archivados (n)" (below "Cerrar sesión"). Their join code stays disabled.
+  This replaces the "hidden from members" behaviour described below.
+- Owner: the user "numan" (`OWNER_USERNAME`/`isOwner` in `server/creators.ts`)
+  manages every space he is a member of like its creator: `membership().isCreator`
+  is true for him (rename, add/remove members, archive, delete, delete files). No
+  one can remove a space's real creator from it.
+- The space screen no longer shows "Código ABCDEF" or "Invitar" (people are added
+  directly). Codes and /unirse links still work for anyone who has them.
+
 ### Fotos screen and archived spaces (added 2026-11-28, user request)
 
 - Space header: "Fotos · Archivos · Miembros (n)". `espacio/[id]/fotos`: the

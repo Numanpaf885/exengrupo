@@ -57,6 +57,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const active = spaces?.filter((s) => !s.archived) ?? null;
   const archived = spaces?.filter((s) => s.archived) ?? [];
 
@@ -126,17 +127,9 @@ export default function Home() {
         </FadeIn>
       )}
       {!!active?.length && <SpaceSection title="Tus espacios" list={active} />}
-      {/* Only their creator sees archived spaces; the members no longer do. */}
-      {!!archived.length && (
-        <SpaceSection
-          title="Archivados"
-          list={archived}
-          footer="Solo tú los ves. Ábrelo y en Miembros pulsa «Desarchivar espacio» para que el grupo lo vuelva a ver."
-        />
-      )}
       {error && <Button label="Reintentar" kind="secondary" onPress={() => void load()} />}
 
-      {/* Lens test and sign out stay out of sight until "Más" is tapped. */}
+      {/* Lens test, sign out and archived spaces stay out of sight until "Más" is tapped. */}
       <View style={styles.more}>
         <Button kind="ghost" label={showMore ? 'Menos' : 'Más'} onPress={() => setShowMore((v) => !v)} />
       </View>
@@ -149,9 +142,15 @@ export default function Home() {
             <ListRow label="Cerrar sesión" onPress={() => void signOut()}>
               <Text tone="accent">Cerrar sesión</Text>
             </ListRow>
+            {!!archived.length && (
+              <ListRow label="Espacios archivados" onPress={() => setShowArchived((v) => !v)}>
+                <Text>Espacios archivados ({archived.length})</Text>
+              </ListRow>
+            )}
           </Section>
         </FadeIn>
       )}
+      {showMore && showArchived && !!archived.length && <SpaceSection title="Espacios archivados" list={archived} />}
     </Screen>
   );
 }

@@ -10,7 +10,11 @@ import type { DataDeps } from './context';
 import type { UserRecord } from './schema';
 
 export const CREATORS_KEY = 'space_creators';
-export const DEFAULT_CREATOR_USERNAMES = ['numan'];
+export const OWNER_USERNAME = 'numan';
+export const DEFAULT_CREATOR_USERNAMES = [OWNER_USERNAME];
+
+/** The owner manages every space he is in, like its creator (user decision 2026-11-28). */
+export const isOwner = (username: string | undefined): boolean => username === OWNER_USERNAME;
 
 export function creatorIds(settings: Record<string, string>, users: UserRecord[]): Set<string> {
   const saved = settings[CREATORS_KEY];
